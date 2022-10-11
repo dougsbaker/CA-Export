@@ -20,7 +20,16 @@
         ############################################################################    
 	
 #>
-
+[CmdletBinding()]
+param (
+    [Parameter()]
+    [String]
+    $TenantID,
+    # Parameter help description
+    [Parameter()]
+    [String]
+    $PolicyID
+)
 #ExportLocation
 $ExportLocation = "C:\scripts\"
 $FileName = "CAPolicy.html"
@@ -37,7 +46,18 @@ try {
   catch {
     Write-host "Connecting: AzureAD"  
    Try {
-    Connect-AzureAD
+    if ($TenantID) {
+        
+    # Use the application ID as the username, and the secret as password
+    $credentials = Get-Credential
+    Connect-AzAccount -ServicePrincipal -Credential $credentials -Tenant $TenantID
+    
+    }
+    else{
+        
+            Connect-AzureAD
+        
+    }
    }
    Catch
    {
@@ -48,7 +68,16 @@ try {
   
 #Collect CA Policy
 Write-host "Exporting: CA Policy"
-$CAPolicy = Get-AzureADMSConditionalAccessPolicy
+if($PolicyID)
+{
+    $CAPolicy = Get-AzureADMSConditionalAccessPolicy -PolicyID $PolicyID
+}
+else
+{
+    $CAPolicy = Get-AzureADMSConditionalAccessPolicy
+
+}
+
 $TenantData = Get-AzureADTenantDetail
 $TenantName = $TenantData.DisplayName
 $date = Get-Date
