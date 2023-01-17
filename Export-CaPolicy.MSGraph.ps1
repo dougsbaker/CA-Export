@@ -30,6 +30,10 @@
         To Verify STill Active
         Get-MgContext
 
+        Mapping
+        https://learn.microsoft.com/en-us/powershell/microsoftgraph/azuread-msoline-cmdlet-map?view=graph-powershell-1.0
+
+
 
 #>
 [CmdletBinding()]
@@ -52,29 +56,20 @@ $HTMLExport = $true
 #Connect-AzureAD
 
 try {
-    Get-AzureADMSConditionalAccessPolicy -ErrorAction Stop > $null
-    Write-host "Connected: AzureAD"
+    Get-MgIdentityConditionalAccessPolicy -ErrorAction Stop > $null
+    Write-host "Connected: MgGraph"
   }
   catch {
-    Write-host "Connecting: AzureAD"  
+    Write-host "Connecting: MgGraph"  
    Try {
-    if ($TenantID) {
-        
-    # Use the application ID as the username, and the secret as password
-    $credentials = Get-Credential
-    Connect-AzAccount -ServicePrincipal -Credential $credentials -Tenant $TenantID
-    
-    }
-    else{
-        
-            Connect-AzureAD
-        
-    }
+        #Connect-AzureAD
+        Select-MgProfile -Name "beta"
+        Connect-MgGraph -Scopes 'Policy.Read.All', 'Directory.Read.All','Application.Read.All'
    }
    Catch
    {
-       Write-host "Error: Please Install AzureAD Module"
-       Write-Host "Run: Install-module AzureAD"
+       Write-host "Error: Please Install MgGraph Module"
+       Write-Host "Run: Install-module MgGraph"
    }
 }
   
@@ -82,15 +77,15 @@ try {
 Write-host "Exporting: CA Policy"
 if($PolicyID)
 {
-    $CAPolicy = Get-AzureADMSConditionalAccessPolicy -PolicyID $PolicyID
+    $CAPolicy = Get-MgIdentityConditionalAccessPolicy -PolicyID $PolicyID
 }
 else
 {
-    $CAPolicy = Get-AzureADMSConditionalAccessPolicy
+    $CAPolicy = Get-MgIdentityConditionalAccessPolicy -all
 
 }
 
-$TenantData = Get-AzureADTenantDetail
+$TenantData = Get-MgOrganization
 $TenantName = $TenantData.DisplayName
 $date = Get-Date
 
@@ -191,7 +186,7 @@ foreach( $Policy in $CAPolicy)
     $ADsearch = $AdUsers | Where-Object {$_ -ne 'All' -and $_ -ne 'GuestsOrExternalUsers' -and $_ -ne 'None'}
     $cajson =  $CAExport | ConvertTo-Json -Depth 4
     $AdNames =@{}
-    Get-AzureADObjectByObjectId -ObjectIds $ADsearch |ForEach-Object{ 
+    Get-MgDirectoryObjectById -ids $ADsearch |ForEach-Object{ 
         $obj = $_.ObjectId
         $disp = $_.DisplayName
         $AdNames.$obj=$disp
@@ -199,20 +194,20 @@ foreach( $Policy in $CAPolicy)
     }
     $CAExport = $cajson |ConvertFrom-Json
 #Switch Apps Guid with Display names
-     $allApps =  Get-AzureADServicePrincipal -All $true 
+     $allApps =  Get-MgServicePrincipal #-All $true 
    $allApps | Where-Object{ $_.AppId -in $Apps} | ForEach-Object{
        $obj = $_.AppId
        $disp =$_.DisplayName
        $cajson = $cajson -replace "$obj", "$disp"
    }
 #switch named location Guid for Display Names
-    Get-AzureADMSNamedLocationPolicy| ForEach-Object{
+    Get-MgIdentityConditionalAccessNamedLocation | ForEach-Object{
         $obj = $_.Id
         $disp =$_.DisplayName
         $cajson = $cajson -replace "$obj", "$disp"
     }
 #Switch Roles Guid to Names
-    Get-AzureADDirectoryRole| ForEach-Object{
+    Get-MgDirectoryRole | ForEach-Object{
         $obj = $_.RoleTemplateId
         $disp =$_.DisplayName
         $cajson = $cajson -replace "$obj", "$disp"
