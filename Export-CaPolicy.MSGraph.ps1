@@ -10,7 +10,13 @@
 		Douglas Baker
 		@dougsbaker
         
-        
+		Andres Bohren
+        @andresbohren
+		Fixed:
+		- Directory Roles
+		- Users
+		- Applications
+		- DeviceFilter
         
         ############################################################################
         This sample script is not supported under any standard support program or service. 
@@ -47,8 +53,9 @@ param (
     $PolicyID
 )
 #ExportLocation
-$ExportLocation = "C:\scripts\"
-$FileName = "CAPolicy.html"
+#$ExportLocation = "C:\scripts\"
+$ExportLocation = $PSScriptRoot
+$FileName = "\CAPolicy.html"
 
 
 $HTMLExport = $true
@@ -131,7 +138,7 @@ foreach( $Policy in $CAPolicy)
     $InclDev = $Policy.Conditions.Devices.IncludeDevices
     $ExclDev = $Policy.Conditions.Devices.ExcludeDevices
     $devFilters = $null
-    $devFilters = $Policy.Conditions.Devices.DeviceFilter
+    $devFilters = $Policy.Conditions.Devices.DeviceFilter.Rule
 
     $CAExport += New-Object PSObject -Property @{ 
         Name = $Policy.DisplayName;
@@ -159,7 +166,7 @@ foreach( $Policy in $CAPolicy)
         DevicesExcluded = ($ExclDev -join ", `r`n");
         DeviceFilters =($devFilters -join ", `r`n");
         'Access Controls' = "";
-     #   Grant = ($Policy.GrantControls.BuiltInControls -join ", `r`n");
+        # Grant = ($Policy.GrantControls.BuiltInControls -join ", `r`n");
         Block = if ($Policy.GrantControls.BuiltInControls -contains "Block") { "True"} else { ""}
         'Require MFA' = if ($Policy.GrantControls.BuiltInControls -contains "Mfa") { "True"} else { ""}
         'CompliantDevice' = if ($Policy.GrantControls.BuiltInControls -contains "CompliantDevice") { "True"} else { ""}
@@ -167,8 +174,8 @@ foreach( $Policy in $CAPolicy)
         'CompliantApplication' = if ($Policy.GrantControls.BuiltInControls -contains "CompliantApplication") { "True"} else { ""}
         'ApprovedApplication'  = if ($Policy.GrantControls.BuiltInControls -contains "ApprovedApplication") { "True"} else { ""}
         'PasswordChange' = if ($Policy.GrantControls.BuiltInControls -contains "PasswordChange") { "True"} else { ""}
-        TermsOfUse = if ($Policy.GrantControls.TermsOfUse -ne $null) {"True"} else {""};
-        CustomControls =  if ($Policy.GrantControls.CustomAuthenticationFactors -ne $null) {"True"} else {""};
+        TermsOfUse = if ($Null -ne $Policy.GrantControls.TermsOfUse) {"True"} else {""};
+        CustomControls =  if ($Null -ne $Policy.GrantControls.CustomAuthenticationFactors) {"True"} else {""};
         GrantOperator = $Policy.GrantControls._Operator
        # Session = $Policy.SessionControls
         ApplicationEnforcedRestrictions = $Policy.SessionControls.ApplicationEnforcedRestrictions.IsEnabled
@@ -180,41 +187,43 @@ foreach( $Policy in $CAPolicy)
     
 }
 
-#Swith user/group Guid to display names
+    #Swith user/group Guid to display names
     Write-host "Converting: AzureAD Guid"
     #Filter out Objects
     $ADsearch = $AdUsers | Where-Object {$_ -ne 'All' -and $_ -ne 'GuestsOrExternalUsers' -and $_ -ne 'None'}
     $cajson =  $CAExport | ConvertTo-Json -Depth 4
     $AdNames =@{}
     Get-MgDirectoryObjectById -ids $ADsearch |ForEach-Object{ 
-        $obj = $_.ObjectId
-        $disp = $_.DisplayName
+        $obj = $_.Id
+        #$disp = $_.DisplayName
+		$disp = $_.AdditionalProperties.userPrincipalName
         $AdNames.$obj=$disp
         $cajson = $cajson -replace "$obj", "$disp"
     }
     $CAExport = $cajson |ConvertFrom-Json
-#Switch Apps Guid with Display names
-     $allApps =  Get-MgServicePrincipal #-All $true 
-   $allApps | Where-Object{ $_.AppId -in $Apps} | ForEach-Object{
+    #Switch Apps Guid with Display names
+    $allApps =  Get-MgServicePrincipal -All
+    $allApps | Where-Object{ $_.AppId -in $Apps} | ForEach-Object{
        $obj = $_.AppId
        $disp =$_.DisplayName
        $cajson = $cajson -replace "$obj", "$disp"
    }
-#switch named location Guid for Display Names
-    Get-MgIdentityConditionalAccessNamedLocation | ForEach-Object{
+   #switch named location Guid for Display Names
+   Get-MgIdentityConditionalAccessNamedLocation | ForEach-Object{
         $obj = $_.Id
         $disp =$_.DisplayName
         $cajson = $cajson -replace "$obj", "$disp"
     }
-#Switch Roles Guid to Names
-    Get-MgDirectoryRole | ForEach-Object{
-        $obj = $_.RoleTemplateId
+    #Switch Roles Guid to Names
+    #Get-MgDirectoryRole | ForEach-Object{
+	Get-MgDirectoryRoleTemplate | ForEach-Object{
+        $obj = $_.Id
         $disp =$_.DisplayName
         $cajson = $cajson -replace "$obj", "$disp"
     }
    $CAExport = $cajson |ConvertFrom-Json
 
-#Export Setup
+    #Export Setup
     Write-host "Pivoting: CA to Export Format"
     $pivot = @()
     $rowItem = New-Object PSObject
@@ -227,7 +236,7 @@ foreach( $Policy in $CAPolicy)
                 $pcount += 1
     }
     $pivot += $rowItem
-  #  $pivot | Out-GridView
+
 #Add Data to Report
 $Rows = $CAExport | Get-Member | Where-Object {$_.MemberType -eq "NoteProperty"}
 $Rows| ForEach-Object{
@@ -250,6 +259,9 @@ $Rows| ForEach-Object{
     }
     $pivot += $rowItem
 }
+
+
+
 #Set Row Order
 $sort = "Name","Status","Users","UsersInclude","UsersExclude","Cloud apps or actions", "ApplicationsIncluded","ApplicationsExcluded",`
         "userActions","AuthContext","Conditions", "UserRisk","SignInRisk","PlatformsInclude","PlatformsExclude","ClientApps", "LocationsIncluded",`
@@ -257,6 +269,8 @@ $sort = "Name","Status","Users","UsersInclude","UsersExclude","Cloud apps or act
         "DomainJoinedDevice","CompliantApplication", "ApprovedApplication","PasswordChange", "TermsOfUse", "CustomControls", "GrantOperator", `
         "Session","ApplicationEnforcedRestrictions", "CloudAppSecurity", "PersistentBrowser", "SignInFrequency"
 
+#Debug
+$pivot | Sort-Object $sort | Out-GridView
        
 
 
