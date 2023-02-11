@@ -270,7 +270,7 @@ $sort = "Name","Status","Users","UsersInclude","UsersExclude","Cloud apps or act
         "Session","ApplicationEnforcedRestrictions", "CloudAppSecurity", "PersistentBrowser", "SignInFrequency"
 
 #Debug
-$pivot | Sort-Object $sort | Out-GridView
+#$pivot | Sort-Object $sort | Out-GridView
        
 
 
