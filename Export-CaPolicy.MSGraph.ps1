@@ -1,30 +1,30 @@
 #Conditional Access Export Utility
 
 <#
-	.SYNOPSIS
-		Conditional Access Export Utility
-	.DESCRIPTION
-		Exports CA Policy to HTML Format for auditing/historical purposes. 
+.SYNOPSIS
+	Conditional Access Export Utility
+.DESCRIPTION
+	Exports CA Policy to HTML Format for auditing/historical purposes. 
 
-	.NOTES
-		Douglas Baker
-		@dougsbaker
-		
-		Andres Bohren
-		@andresbohren
-		10.02.2023 Fixed:
-		- Directory Roles
-		- Users
-		- Applications
-		- DeviceFilter
+.NOTES
+	Douglas Baker
+	@dougsbaker
+	
+	Andres Bohren
+	@andresbohren
+	10.02.2023 Fixed:
+	- Directory Roles
+	- Users
+	- Applications
+	- DeviceFilter
 
-		Andres Bohren
-		@andresbohren
-		13.02.2023 Fixed:
-		- Test Module and Connect-MgGrap
-		- Addet Session Controls
-		- Output is now devided into Conditions, SessionControls, GrantControls
-		- Code Cleanup and changed from Spaces to Tabs
+	Andres Bohren
+	@andresbohren
+	13.02.2023 Fixed:
+	- Test Module and Connect-MgGrap
+	- Addet Session Controls
+	- Output is now devided into Conditions, SessionControls, GrantControls
+	- Code Cleanup and changed from Spaces to Tabs
 
 #>
 [CmdletBinding()]
@@ -245,8 +245,7 @@ $Rows| ForEach-Object{
 	$pivot += $rowItem
 }
 
-
-
+#Column Sorting Order
 $sort = "Name","Status","Conditions","UsersInclude","UsersExclude","Cloud apps or actions", "ApplicationsIncluded","ApplicationsExcluded",`
 		"userActions","AuthContext", "UserRisk","SignInRisk","PlatformsInclude","PlatformsExclude","ClientApps", "LocationsIncluded",`
 		"LocationsExcluded","Devices","DevicesIncluded","DevicesExcluded","DeviceFilters",`
@@ -262,7 +261,7 @@ $sort = "Name","Status","Conditions","UsersInclude","UsersExclude","Cloud apps o
 #HTML Export
 if ($HTMLExport) {
 	Write-host "Saving to File: HTML"
-$jquery = '  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+	$jquery = '<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
 	<script>
 	$(document).ready(function(){
 		$("tr").click(function(){
@@ -284,79 +283,78 @@ $jquery = '  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jqu
 	});
 	</script>'
 $html = "<html><head><base href='https://docs.microsoft.com/' target='_blank'>
-				$jquery<style>
-				.title{
-					display: block;
-					font-size: 2em;
-					margin-block-start: 0.67em;
-					margin-block-end: 0.67em;
-					margin-inline-start: 0px;
-					margin-inline-end: 0px;
-					font-weight: bold;
-					font-family: Segoe UI;
-					
-				}
-				table{
-					border-collapse: collapse;
-					margin: 25px 0;
-					font-size: 0.9em;
-					font-family: Segoe UI;
-					min-width: 400px;
-					box-shadow: 0 0 20px rgba(0, 0, 0, 0.15) ;
-					text-align: center;
-				}
-				thead tr {
-					background-color: #009879;
-					color: #ffffff;
-					text-align: left;
-				}
-				th, td {
-					min-width: 250px;
-					padding: 12px 15px;
-					border: 1px solid lightgray;
-					vertical-align: top;
-				}
-				td {
-					vertical-align: top;
-				}
-				tbody tr {
-					border-bottom: 1px solid #dddddd;
-				}
-				tbody tr:nth-of-type(even) {
-					background-color: #f3f3f3;
-				}
-				tbody tr:nth-of-type(4), tbody tr:nth-of-type(22), tbody tr:nth-of-type(39){
-					background-color: #36c;
-					text-aling:left !important
-				}
-				tbody tr:last-of-type {
-					border-bottom: 2px solid #009879;
-				}
-				tr:hover{
-				background-color: #ffea76!important;
-			}
-			.selected:not(th){
-				background-color:#ffea76!important;
-				}
-				th{
-					background-color:white !important;
-				}
-				.colselected {
-				background-color: rgb(93, 236, 213)!important;
-				}
-				table tr th:first-child,table tr td:first-child {
-					position: sticky;
-					inset-inline-start: 0; 
-					background-color: #36c!important;
-					Color: #fff;
-					font-weight: bolder;
-					text-align: center;
-				}
-				</style></head><body> <div class='Title'>CA Export: $Tenantname - $Date </div>"
+	$jquery<style>
+	.title{
+		display: block;
+		font-size: 2em;
+		margin-block-start: 0.67em;
+		margin-block-end: 0.67em;
+		margin-inline-start: 0px;
+		margin-inline-end: 0px;
+		font-weight: bold;
+		font-family: Segoe UI;
+	}
+	table{
+		border-collapse: collapse;
+		margin: 25px 0;
+		font-size: 0.9em;
+		font-family: Segoe UI;
+		min-width: 400px;
+		box-shadow: 0 0 20px rgba(0, 0, 0, 0.15) ;
+		text-align: center;
+	}
+	thead tr {
+		background-color: #009879;
+		color: #ffffff;
+		text-align: left;
+	}
+	th, td {
+		min-width: 250px;
+		padding: 12px 15px;
+		border: 1px solid lightgray;
+		vertical-align: top;
+	}
+	td {
+		vertical-align: top;
+	}
+	tbody tr {
+		border-bottom: 1px solid #dddddd;
+	}
+	tbody tr:nth-of-type(even) {
+		background-color: #f3f3f3;
+	}
+	tbody tr:nth-of-type(4), tbody tr:nth-of-type(22), tbody tr:nth-of-type(39){
+		background-color: #36c;
+		text-aling:left !important
+	}
+	tbody tr:last-of-type {
+		border-bottom: 2px solid #009879;
+	}
+	tr:hover{
+	background-color: #ffea76!important;
+	}
+	.selected:not(th){
+		background-color:#ffea76!important;
+	}
+	th{
+		background-color:white !important;
+	}
+	.colselected {
+	background-color: rgb(93, 236, 213)!important;
+	}
+	table tr th:first-child,table tr td:first-child {
+		position: sticky;
+		inset-inline-start: 0; 
+		background-color: #36c!important;
+		Color: #fff;
+		font-weight: bolder;
+		text-align: center;
+	}
+	</style></head><body> <div class='Title'>CA Export: $Tenantname - $Date </div>"
 
 	Write-host "Launching: Web Browser"
 	$Launch = $ExportLocation+$FileName
 	$HTML += $pivot  | Where-Object {$_."CA Item" -ne 'row1' } | Sort-object { $sort.IndexOf($_."CA Item") }| convertto-html -Fragment
 	$HTML | Out-File $Launch
-		start-process $Launch
+	start-process $Launch
 }
