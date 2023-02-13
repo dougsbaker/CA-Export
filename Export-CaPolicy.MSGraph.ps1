@@ -53,31 +53,28 @@ param (
     $PolicyID
 )
 #ExportLocation
-#$ExportLocation = "C:\scripts\"
 $ExportLocation = $PSScriptRoot
 $FileName = "\CAPolicy.html"
-
-
 $HTMLExport = $true
 
-#Connect-AzureAD
+#Test Graph Module
+$GraphModule = Get-Module "Microsoft.Graph" -ListAvailable
+If ($Null -eq $GraphModule)
+{
+	Write-Host "Microsoft.Graph Module not installed" -ForegroundColor Yellow
+	Write-Host "Use: Install-Module -Name Microsoft.Graph" -ForegroundColor Yellow
+	break
+}
 
-try {
-    Get-MgIdentityConditionalAccessPolicy -ErrorAction Stop > $null
-    Write-host "Connected: MgGraph"
-  }
-  catch {
-    Write-host "Connecting: MgGraph"  
-   Try {
-        #Connect-AzureAD
-        Select-MgProfile -Name "beta"
-        Connect-MgGraph -Scopes 'Policy.Read.All', 'Directory.Read.All','Application.Read.All'
-   }
-   Catch
-   {
-       Write-host "Error: Please Install MgGraph Module"
-       Write-Host "Run: Install-module MgGraph"
-   }
+#Connect-MgGraph
+$MgContext = Get-MgContext
+If ($Null -eq $MgContext)
+{
+	Write-host "Connect-MgGraph..."
+	Select-MgProfile -Name "beta"
+	Connect-MgGraph -Scopes 'Policy.Read.All', 'Directory.Read.All','Application.Read.All'
+} else {
+	Write-host "Connected: MgGraph"
 }
   
 #Collect CA Policy
@@ -92,6 +89,7 @@ else
 
 }
 
+#Tenant Informations
 $TenantData = Get-MgOrganization
 $TenantName = $TenantData.DisplayName
 $date = Get-Date
@@ -141,9 +139,10 @@ foreach( $Policy in $CAPolicy)
     $devFilters = $Policy.Conditions.Devices.DeviceFilter.Rule
 
     $CAExport += New-Object PSObject -Property @{ 
+		Conditions = "";
         Name = $Policy.DisplayName;
         Status = $Policy.State;
-        Users = "";
+        #Users = "";
         UsersInclude = ($IncludeUG -join ", `r`n");
         UsersExclude = ($ExcludeUG -join ", `r`n");
         'Cloud apps or actions' ="";
@@ -151,7 +150,7 @@ foreach( $Policy in $CAPolicy)
         ApplicationsExcluded = ($Policy.Conditions.Applications.ExcludeApplications -join ", `r`n");
         userActions = ($Policy.Conditions.Applications.IncludeUserActions -join ", `r`n");
         AuthContext = ($Policy.Conditions.Applications.IncludeAuthenticationContextClassReferences -join ", `r`n");
-        Conditions = "";
+        #Conditions = "";
         UserRisk = ($Policy.Conditions.UserRiskLevels -join ", `r`n");
         SignInRisk = ($Policy.Conditions.SignInRiskLevels -join ", `r`n");
        # Platforms = $Policy.Conditions.Platforms;
@@ -165,23 +164,43 @@ foreach( $Policy in $CAPolicy)
         DevicesIncluded = ($InclDev -join ", `r`n");
         DevicesExcluded = ($ExclDev -join ", `r`n");
         DeviceFilters =($devFilters -join ", `r`n");
-        'Access Controls' = "";
-        # Grant = ($Policy.GrantControls.BuiltInControls -join ", `r`n");
-        Block = if ($Policy.GrantControls.BuiltInControls -contains "Block") { "True"} else { ""}
-        'Require MFA' = if ($Policy.GrantControls.BuiltInControls -contains "Mfa") { "True"} else { ""}
-        'CompliantDevice' = if ($Policy.GrantControls.BuiltInControls -contains "CompliantDevice") { "True"} else { ""}
-        'DomainJoinedDevice'  = if ($Policy.GrantControls.BuiltInControls -contains "DomainJoinedDevice") { "True"} else { ""}
-        'CompliantApplication' = if ($Policy.GrantControls.BuiltInControls -contains "CompliantApplication") { "True"} else { ""}
-        'ApprovedApplication'  = if ($Policy.GrantControls.BuiltInControls -contains "ApprovedApplication") { "True"} else { ""}
-        'PasswordChange' = if ($Policy.GrantControls.BuiltInControls -contains "PasswordChange") { "True"} else { ""}
-        TermsOfUse = if ($Null -ne $Policy.GrantControls.TermsOfUse) {"True"} else {""};
-        CustomControls =  if ($Null -ne $Policy.GrantControls.CustomAuthenticationFactors) {"True"} else {""};
-        GrantOperator = $Policy.GrantControls._Operator
-       # Session = $Policy.SessionControls
+        
+		#Session Controls
+		SessionControls = ""
+		#Session = $Policy.SessionControls
+		SessionControlsAdditionalProperties = $Policy.SessionControls.AdditionalProperties
+
+		<#
         ApplicationEnforcedRestrictions = $Policy.SessionControls.ApplicationEnforcedRestrictions.IsEnabled
         CloudAppSecurity                = $Policy.SessionControls.CloudAppSecurity.IsEnabled
         PersistentBrowser               = $Policy.SessionControls.PersistentBrowser.Mode
         SignInFrequency                 = "$($Policy.SessionControls.SignInFrequency.Value) $($conditionalAccessPolicy.SessionControls.SignInFrequency.Type)"
+		#>
+
+		ApplicationEnforcedRestrictionsIsEnabled =  $Policy.SessionControls.ApplicationEnforcedRestrictions.IsEnabled
+		ApplicationEnforcedRestrictionsAdditionalProperties = $Policy.SessionControls.ApplicationEnforcedRestrictions.AdditionalProperties
+		CloudAppSecurityType = $Policy.SessionControls.CloudAppSecurity.CloudAppSecurityType
+		CloudAppSecurityIsEnabled = $Policy.SessionControls.CloudAppSecurity.IsEnabled
+		CloudAppSecurityAdditionalProperties = $Policy.SessionControls.CloudAppSecurity.AdditionalProperties
+		DisableResilienceDefaults = $Policy.SessionControls.DisableResilienceDefaults
+		PersistentBrowserIsEnabled = $Policy.SessionControls.PersistentBrowser.IsEnabled
+		PersistentBrowserMode = $Policy.SessionControls.PersistentBrowser.Mode
+		PersistentBrowserAdditionalProperties = $Policy.SessionControls.PersistentBrowser.AdditionalProperties
+		SignInFrequencyAuthenticationType = $Policy.SessionControls.SignInFrequency.AuthenticationType
+		SignInFrequencyInterval = $Policy.SessionControls.SignInFrequency.FrequencyInterval
+		SignInFrequencyIsEnabled = $Policy.SessionControls.SignInFrequency.IsEnabled
+		SignInFrequencyType = $Policy.SessionControls.SignInFrequency.Type
+		SignInFrequencyValue = $Policy.SessionControls.SignInFrequency.Value
+		SignInFrequencyAdditionalProperties = $Policy.SessionControls.SignInFrequency.AdditionalProperties
+		
+		
+		#Grant Controls
+		GrantControls = "";
+        BuiltInControls = $($Policy.GrantControls.BuiltInControls)
+		TermsOfUse = $($Policy.GrantControls.TermsOfUse)
+        CustomControls =  $($Policy.GrantControls.CustomAuthenticationFactors)
+        GrantOperator = $Policy.GrantControls.Operator
+       # 
     }
   
     
@@ -263,11 +282,25 @@ $Rows| ForEach-Object{
 
 
 #Set Row Order
+<#
 $sort = "Name","Status","Users","UsersInclude","UsersExclude","Cloud apps or actions", "ApplicationsIncluded","ApplicationsExcluded",`
         "userActions","AuthContext","Conditions", "UserRisk","SignInRisk","PlatformsInclude","PlatformsExclude","ClientApps", "LocationsIncluded",`
-        "LocationsExcluded","Devices","DevicesIncluded","DevicesExcluded","DeviceFilters", "Access Controls", "Block", "Require MFA", "CompliantDevice",`
+        "LocationsExcluded","Devices","DevicesIncluded","DevicesExcluded","DeviceFilters", "Access Controls", "BuiltInControls", "Require MFA", "CompliantDevice",`
         "DomainJoinedDevice","CompliantApplication", "ApprovedApplication","PasswordChange", "TermsOfUse", "CustomControls", "GrantOperator", `
-        "Session","ApplicationEnforcedRestrictions", "CloudAppSecurity", "PersistentBrowser", "SignInFrequency"
+        
+#>
+$sort = "Name","Status","Conditions","UsersInclude","UsersExclude","Cloud apps or actions", "ApplicationsIncluded","ApplicationsExcluded",`
+        "userActions","AuthContext", "UserRisk","SignInRisk","PlatformsInclude","PlatformsExclude","ClientApps", "LocationsIncluded",`
+        "LocationsExcluded","Devices","DevicesIncluded","DevicesExcluded","DeviceFilters",`
+		"SessionControls","SessionControlsAdditionalProperties","ApplicationEnforcedRestrictionsIsEnabled","ApplicationEnforcedRestrictionsAdditionalProperties",`
+		"CloudAppSecurityType", "CloudAppSecurityIsEnabled","CloudAppSecurityAdditionalProperties","DisableResilienceDefaults","PersistentBrowserIsEnabled",`
+		"PersistentBrowserMode","PersistentBrowserAdditionalProperties","SignInFrequencyAuthenticationType","SignInFrequencyInterval","SignInFrequencyIsEnabled",`
+		"SignInFrequencyType","SignInFrequencyValue","SignInFrequencyAdditionalProperties",`
+		"GrantControls", "BuiltInControls", "TermsOfUse", "CustomControls", "GrantOperator"
+        
+
+
+
 
 #Debug
 #$pivot | Sort-Object $sort | Out-GridView
@@ -340,7 +373,7 @@ $html = "<html><head><base href='https://docs.microsoft.com/' target='_blank'>
                 tbody tr:nth-of-type(even) {
                     background-color: #f3f3f3;
                }
-               tbody tr:nth-of-type(4), tbody tr:nth-of-type(7), tbody tr:nth-of-type(12), tbody tr:nth-of-type(23){
+               tbody tr:nth-of-type(4), tbody tr:nth-of-type(22), tbody tr:nth-of-type(39){
                     background-color: #36c;
                     text-aling:left !important
                 }
