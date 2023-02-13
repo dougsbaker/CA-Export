@@ -140,7 +140,7 @@ foreach( $Policy in $CAPolicy)
 		LocationsIncluded = ($InclLocation -join ", `r`n");
 		LocationsExcluded = ($ExclLocation -join ", `r`n");
 		ClientApps = ($Policy.Conditions.ClientAppTypes -join ", `r`n");
-	   # Devices = $Policy.Conditions.Devices;
+		# Devices = $Policy.Conditions.Devices;
 		DevicesIncluded = ($InclDev -join ", `r`n");
 		DevicesExcluded = ($ExclDev -join ", `r`n");
 		DeviceFilters =($devFilters -join ", `r`n");
@@ -164,7 +164,7 @@ foreach( $Policy in $CAPolicy)
 		SignInFrequencyType = $Policy.SessionControls.SignInFrequency.Type
 		SignInFrequencyValue = $Policy.SessionControls.SignInFrequency.Value
 		SignInFrequencyAdditionalProperties = $Policy.SessionControls.SignInFrequency.AdditionalProperties
-				
+
 		### Grant Controls ###
 		GrantControls = "";
 		BuiltInControls = $($Policy.GrantControls.BuiltInControls)
@@ -191,12 +191,12 @@ foreach( $Policy in $CAPolicy)
 	#Switch Apps Guid with Display names
 	$allApps =  Get-MgServicePrincipal -All
 	$allApps | Where-Object{ $_.AppId -in $Apps} | ForEach-Object{
-	   $obj = $_.AppId
-	   $disp =$_.DisplayName
-	   $cajson = $cajson -replace "$obj", "$disp"
-   }
-   #switch named location Guid for Display Names
-   Get-MgIdentityConditionalAccessNamedLocation | ForEach-Object{
+		$obj = $_.AppId
+		$disp =$_.DisplayName
+		$cajson = $cajson -replace "$obj", "$disp"
+	}
+	#switch named location Guid for Display Names
+	Get-MgIdentityConditionalAccessNamedLocation | ForEach-Object{
 		$obj = $_.Id
 		$disp =$_.DisplayName
 		$cajson = $cajson -replace "$obj", "$disp"
@@ -237,10 +237,10 @@ $Rows| ForEach-Object{
 			$a = $_.name
 			$b = $ca.$a
 			if ($a -eq $rowname) {
-			  $rowitem | Add-Member -type NoteProperty -Name "Policy $pcount" -Value $b  
+				$rowitem | Add-Member -type NoteProperty -Name "Policy $pcount" -Value $b  
 			}
 		}
-	  $pcount += 1
+		$pcount += 1
 	}
 	$pivot += $rowItem
 }
@@ -304,7 +304,7 @@ $html = "<html><head><base href='https://docs.microsoft.com/' target='_blank'>
 					min-width: 400px;
 					box-shadow: 0 0 20px rgba(0, 0, 0, 0.15) ;
 					text-align: center;
-			   }
+				}
 				thead tr {
 					background-color: #009879;
 					color: #ffffff;
