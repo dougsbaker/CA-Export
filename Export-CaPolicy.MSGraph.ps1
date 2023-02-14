@@ -25,19 +25,7 @@
         https://creativecommons.org/licenses/by-nc-sa/4.0/
         ############################################################################    
     
-    .ToDO
-
-        Update Script to USe PowerShell MG
-        https://learn.microsoft.com/en-us/powershell/microsoftgraph/authentication-commands?view=graph-powershell-1.0
-
-        Connect-MgGraph -Scopes 'Policy.Read.All'
-        Get-MgIdentityConditionalAccessPolicy
-
-        To Verify STill Active
-        Get-MgContext
-
-        Mapping
-        https://learn.microsoft.com/en-us/powershell/microsoftgraph/azuread-msoline-cmdlet-map?view=graph-powershell-1.0
+    
 
 
 
