@@ -164,7 +164,7 @@ foreach( $Policy in $CAPolicy)
         'PasswordChange' = if ($Policy.GrantControls.BuiltInControls -contains "PasswordChange") { "True"} else { ""}
         TermsOfUse = if ($Null -ne $Policy.GrantControls.TermsOfUse) {"True"} else {""};
         CustomControls =  if ($Null -ne $Policy.GrantControls.CustomAuthenticationFactors) {"True"} else {""};
-        GrantOperator = $Policy.GrantControls._Operator
+        GrantOperator = $Policy.GrantControls.Operator
        # Session = $Policy.SessionControls
         ApplicationEnforcedRestrictions = $Policy.SessionControls.ApplicationEnforcedRestrictions.IsEnabled
         CloudAppSecurity                = $Policy.SessionControls.CloudAppSecurity.IsEnabled
