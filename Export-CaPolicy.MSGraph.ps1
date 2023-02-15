@@ -72,7 +72,7 @@ try {
 Write-host "Exporting: CA Policy"
 if($PolicyID)
 {
-    $CAPolicy = Get-MgIdentityConditionalAccessPolicy -PolicyID $PolicyID
+    $CAPolicy = Get-MgIdentityConditionalAccessPolicy -ConditionalAccessPolicyId $PolicyID
 }
 else
 {
@@ -127,7 +127,7 @@ foreach( $Policy in $CAPolicy)
     $ExclDev = $Policy.Conditions.Devices.ExcludeDevices
     $devFilters = $null
     $devFilters = $Policy.Conditions.Devices.DeviceFilter.Rule
-
+ 
     $CAExport += New-Object PSObject -Property @{ 
         Name = $Policy.DisplayName;
         Status = $Policy.State;
@@ -157,6 +157,7 @@ foreach( $Policy in $CAPolicy)
         # Grant = ($Policy.GrantControls.BuiltInControls -join ", `r`n");
         Block = if ($Policy.GrantControls.BuiltInControls -contains "Block") { "True"} else { ""}
         'Require MFA' = if ($Policy.GrantControls.BuiltInControls -contains "Mfa") { "True"} else { ""}
+        'Authentication Strength MFA' = $Policy.GrantControls.AuthenticationStrength.DisplayName
         'CompliantDevice' = if ($Policy.GrantControls.BuiltInControls -contains "CompliantDevice") { "True"} else { ""}
         'DomainJoinedDevice'  = if ($Policy.GrantControls.BuiltInControls -contains "DomainJoinedDevice") { "True"} else { ""}
         'CompliantApplication' = if ($Policy.GrantControls.BuiltInControls -contains "CompliantApplication") { "True"} else { ""}
@@ -253,7 +254,7 @@ $Rows| ForEach-Object{
 #Set Row Order
 $sort = "Name","Status","Users","UsersInclude","UsersExclude","Cloud apps or actions", "ApplicationsIncluded","ApplicationsExcluded",`
         "userActions","AuthContext","Conditions", "UserRisk","SignInRisk","PlatformsInclude","PlatformsExclude","ClientApps", "LocationsIncluded",`
-        "LocationsExcluded","Devices","DevicesIncluded","DevicesExcluded","DeviceFilters", "Access Controls", "Block", "Require MFA", "CompliantDevice",`
+        "LocationsExcluded","Devices","DevicesIncluded","DevicesExcluded","DeviceFilters", "Access Controls", "Block", "Require MFA", "Authentication Strength MFA", "CompliantDevice",`
         "DomainJoinedDevice","CompliantApplication", "ApprovedApplication","PasswordChange", "TermsOfUse", "CustomControls", "GrantOperator", `
         "Session","ApplicationEnforcedRestrictions", "CloudAppSecurity", "PersistentBrowser", "SignInFrequency"
 
