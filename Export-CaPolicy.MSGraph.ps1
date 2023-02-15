@@ -63,11 +63,17 @@ try {
    }
    Catch
    {
-       Write-host "Error: Please Install MgGraph Module"
-       Write-Host "Run: Install-module MgGraph"
+       Write-host "Error: Please Install MgGraph Module" -ForegroundColor Yellow
+       Write-Host "Run: Install-module MgGraph" -ForegroundColor Yellow
    }
 }
-  
+
+$TenantData = Get-MgOrganization
+$TenantName = $TenantData.DisplayName
+$date = Get-Date
+ Write-Host "Connected: $TenantName tenant"
+
+
 #Collect CA Policy
 Write-host "Exporting: CA Policy"
 if($PolicyID)
