@@ -169,8 +169,8 @@ foreach( $Policy in $CAPolicy)
         'CompliantApplication' = if ($Policy.GrantControls.BuiltInControls -contains "CompliantApplication") { "True"} else { ""}
         'ApprovedApplication'  = if ($Policy.GrantControls.BuiltInControls -contains "ApprovedApplication") { "True"} else { ""}
         'PasswordChange' = if ($Policy.GrantControls.BuiltInControls -contains "PasswordChange") { "True"} else { ""}
-        TermsOfUse = if ($Null -ne $Policy.GrantControls.TermsOfUse) {"True"} else {""};
-        CustomControls =  if ($Null -ne $Policy.GrantControls.CustomAuthenticationFactors) {"True"} else {""};
+        TermsOfUse = ($Policy.GrantControls.TermsOfUse -join ", `r`n");
+        CustomControls =  ($Policy.GrantControls.CustomAuthenticationFactors -join ", `r`n");
         GrantOperator = $Policy.GrantControls.Operator
        # Session = $Policy.SessionControls
         ApplicationEnforcedRestrictions = $Policy.SessionControls.ApplicationEnforcedRestrictions.IsEnabled
