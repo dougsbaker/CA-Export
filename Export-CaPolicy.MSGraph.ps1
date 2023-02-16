@@ -190,8 +190,7 @@ foreach( $Policy in $CAPolicy)
     $AdNames =@{}
     Get-MgDirectoryObjectById -ids $ADsearch |ForEach-Object{ 
         $obj = $_.Id
-        #$disp = $_.DisplayName
-		$disp = $_.AdditionalProperties.userPrincipalName
+        $disp = $_.AdditionalProperties.displayName
         $AdNames.$obj=$disp
         $cajson = $cajson -replace "$obj", "$disp"
     }
