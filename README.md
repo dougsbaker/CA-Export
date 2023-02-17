@@ -8,6 +8,11 @@ This tool has 2 versions one using older Azure AD PowerShell modules and 1 that 
 
 [Graph API Version](https://github.com/dougsbaker/CA-Export/blob/main/Export-CaPolicy.MSGraph.ps1)
 
+
+
+
+### License
+
 Shield: [![CC BY-NC-SA 4.0][cc-by-nc-sa-shield]][cc-by-nc-sa]
 
 This work is licensed under a
