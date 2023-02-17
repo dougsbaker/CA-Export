@@ -208,6 +208,13 @@ foreach( $Policy in $CAPolicy)
         $disp =$_.DisplayName
         $cajson = $cajson -replace "$obj", "$disp"
     }
+    #Switch TOU Id for display name
+    Get-MgAgreement |ForEach-Object {
+        $obj = $_.Id
+        $disp =$_.DisplayName
+        $cajson = $cajson -replace "$obj", "$disp"
+    }
+
     #Switch Roles Guid to Names
     #Get-MgDirectoryRole | ForEach-Object{
 	Get-MgDirectoryRoleTemplate | ForEach-Object{
