@@ -48,8 +48,6 @@ $FileName = "\CAPolicy.html"
 
 $HTMLExport = $true
 
-#Connect-AzureAD
-
 try {
     Get-MgIdentityConditionalAccessPolicy -ErrorAction Stop > $null
     Write-host "Connected: MgGraph"
