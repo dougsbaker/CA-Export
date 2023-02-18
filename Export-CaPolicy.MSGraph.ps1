@@ -281,20 +281,18 @@ $jquery = '  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jqu
     <script>
     $(document).ready(function(){
         $("tr").click(function(){
-        if(!$(this).hasClass("selected")){
-            $(this).addClass("selected");
-        } else {
-            $(this).removeClass("selected");
-        }
-
+            if(!$(this).hasClass("selected")){
+                $(this).addClass("selected");
+            } else {
+                $(this).removeClass("selected");
+            }
         });
+        
         $("th").click(function(){
-        if(!$(this).hasClass("colselected")){
-            $(this).addClass("colselected");
-        } else {
-            $(this).removeClass("colselected");
-        }
-
+            // Get the index of the clicked column
+            var colIndex = $(this).index();
+            // Select the corresponding col element and add or remove the class
+            $("colgroup col").eq(colIndex).toggleClass("colselected");
         });
     });
     </script>'
@@ -361,7 +359,7 @@ $html = "<html><head><base href='https://docs.microsoft.com/' target='_blank'>
                 }
                 .colselected {
               
-              background-color: rgb(93, 236, 213)!important;
+                    width: 10%; border: 5px solid #59c7fb;
               
               }
               table tr th:first-child,table tr td:first-child {
