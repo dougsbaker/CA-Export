@@ -154,7 +154,7 @@ foreach ( $Policy in $CAPolicy) {
         DevicesIncluded                 = ($InclDev -join ", `r`n");
         DevicesExcluded                 = ($ExclDev -join ", `r`n");
         DeviceFilters                   = ($devFilters -join ", `r`n");
-        'Access Controls'               = "";
+        'Grant Controls'               = "";
         # Grant = ($Policy.GrantControls.BuiltInControls -join ", `r`n");
         Block                           = if ($Policy.GrantControls.BuiltInControls -contains "Block") { "True" } else { "" }
         'Require MFA'                   = if ($Policy.GrantControls.BuiltInControls -contains "Mfa") { "True" } else { "" }
@@ -168,10 +168,13 @@ foreach ( $Policy in $CAPolicy) {
         CustomControls                  = ($Policy.GrantControls.CustomAuthenticationFactors -join ", `r`n");
         GrantOperator                   = $Policy.GrantControls.Operator
         # Session = $Policy.SessionControls
+        'Session Controls'               = "";
         ApplicationEnforcedRestrictions = $Policy.SessionControls.ApplicationEnforcedRestrictions.IsEnabled
         CloudAppSecurity                = $Policy.SessionControls.CloudAppSecurity.IsEnabled
-        PersistentBrowser               = $Policy.SessionControls.PersistentBrowser.Mode
         SignInFrequency                 = "$($Policy.SessionControls.SignInFrequency.Value) $($conditionalAccessPolicy.SessionControls.SignInFrequency.Type)"
+        PersistentBrowser               = $Policy.SessionControls.PersistentBrowser.Mode
+        ContinuousAccessEvaluation      = $Policy.SessionControls.ContinuousAccessEvaluation.Mode
+        ResiliantDefaults               = $policy.SessionControls.DisableResilienceDefaults
     }
   
     
@@ -259,13 +262,12 @@ $Rows | ForEach-Object {
 #Set Row Order
 $sort = "Name", "Status", "Users", "UsersInclude", "UsersExclude", "Cloud apps or actions", "ApplicationsIncluded", "ApplicationsExcluded", `
     "userActions", "AuthContext", "Conditions", "UserRisk", "SignInRisk", "PlatformsInclude", "PlatformsExclude", "ClientApps", "LocationsIncluded", `
-    "LocationsExcluded", "Devices", "DevicesIncluded", "DevicesExcluded", "DeviceFilters", "Access Controls", "Block", "Require MFA", "Authentication Strength MFA", "CompliantDevice", `
+    "LocationsExcluded", "Devices", "DevicesIncluded", "DevicesExcluded", "DeviceFilters", "Grant Controls", "Block", "Require MFA", "Authentication Strength MFA", "CompliantDevice", `
     "DomainJoinedDevice", "CompliantApplication", "ApprovedApplication", "PasswordChange", "TermsOfUse", "CustomControls", "GrantOperator", `
-    "Session", "ApplicationEnforcedRestrictions", "CloudAppSecurity", "PersistentBrowser", "SignInFrequency"
+    "Session Controls",  "ApplicationEnforcedRestrictions", "CloudAppSecurity", "SignInFrequency", "PersistentBrowser",  "ContinuousAccessEvaluation", "ResiliantDefaults"
 
 #Debug
-#$pivot | Sort-Object $sort | Out-GridView
-       
+#$pivot | Sort-Object $sort | Out-GridView           
 
 
 if ($HTMLExport) {
@@ -332,7 +334,7 @@ if ($HTMLExport) {
                 tbody tr:nth-of-type(even) {
                     background-color: #f3f3f3;
                }
-               tbody tr:nth-of-type(4), tbody tr:nth-of-type(7), tbody tr:nth-of-type(12), tbody tr:nth-of-type(23){
+               tbody tr:nth-of-type(4), tbody tr:nth-of-type(7), tbody tr:nth-of-type(12), tbody tr:nth-of-type(23), tbody tr:nth-of-type(35){
                     background-color: #36c;
                     text-aling:left !important
                 }
