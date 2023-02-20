@@ -10,14 +10,17 @@
 		Douglas Baker
 		@dougsbaker
         
+
+        
+        CONTRIBUTORS
 		Andres Bohren
         @andresbohren
-		Fixed:
-		- Directory Roles
-		- Users
-		- Applications
-		- DeviceFilter
+		
         
+        Output report uses open source components for HTML formatting
+        - bootstrap - MIT License - https://getbootstrap.com/docs/4.0/about/license/
+        - fontawesome - CC BY 4.0 License - https://fontawesome.com/license/free
+
         ############################################################################
         This sample script is not supported under any standard support program or service. 
         This sample script is provided AS IS without warranty of any kind. 
@@ -292,80 +295,122 @@ if ($HTMLExport) {
     });
     </script>'
     $html = "<html><head><base href='https://docs.microsoft.com/' target='_blank'>
+    <meta charset='utf-8'>
+        <meta name='viewport' content='width=device-width, initial-scale=1, shrink-to-fit=no'>
+    
+                  <link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/all.min.css' crossorigin='anonymous'>
+                  <link rel='stylesheet' href='https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css' integrity='sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T' crossorigin='anonymous'>
+                  <script src='https://code.jquery.com/jquery-3.3.1.slim.min.js' integrity='sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo' crossorigin='anonymous'></script>
+                  <script src='https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js' integrity='sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1' crossorigin='anonymous'></script>
+                  <script src='https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js' integrity='sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM' crossorigin='anonymous'></script>
+                  <script src='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/js/all.js'></script>
                 $jquery<style>
-                .title{
-                    display: block;
-                    font-size: 2em;
-                    margin-block-start: 0.67em;
-                    margin-block-end: 0.67em;
-                    margin-inline-start: 0px;
-                    margin-inline-end: 0px;
+                .title {
+                    font-size: 1.5em;
                     font-weight: bold;
-                    font-family: Segoe UI;
-                    
+                    font-family: Arial, sans-serif;
+                    top: 0;
+                    right: 0;
+                    left: 0;
                 }
-                table{
+                
+                table {
                     border-collapse: collapse;
-                    margin: 25px 0;
+                    margin-bottom: 30px;
+                    margin-top: 55px;
                     font-size: 0.9em;
-                    font-family: Segoe UI;
+                    font-family: Arial, sans-serif;
                     min-width: 400px;
-                    box-shadow: 0 0 20px rgba(0, 0, 0, 0.15) ;
-                    text-align: center;
-               }
-                thead tr {
-                    background-color: #009879;
-                    color: #ffffff;
-                    text-align: left;
-               }
-                th, td {
-                    min-width: 250px;
-                    padding: 12px 15px;
-                    border: 1px solid lightgray;
-                    vertical-align: top;
-               }
-               
-                td {
-                    vertical-align: top;
-               }
-                tbody tr {
-                    border-bottom: 1px solid #dddddd;
-               }
-                tbody tr:nth-of-type(even) {
-                    background-color: #f3f3f3;
-               }
-               tbody tr:nth-of-type(4), tbody tr:nth-of-type(7), tbody tr:nth-of-type(12), tbody tr:nth-of-type(23), tbody tr:nth-of-type(35){
-                    background-color: #36c;
-                    text-aling:left !important
-                }
-                tbody tr:last-of-type {
-                    border-bottom: 2px solid #009879;
-               }
-               tr:hover{
-                background-color: #ffea76!important;
-            }
-            
-            .selected:not(th){
-                background-color:#ffea76!important;
                 
                 }
-                th{
-                   background-color:white !important;
+                  thead tr {
+                      background-color: #009879;
+                      color: #ffffff;
+                      text-align: center;
+                 }
+                  th, td {
+                      min-width: 250px;
+                      padding: 12px 15px;
+                      border: 1px solid lightgray;
+                      vertical-align: top;
+                      text-align: center;
+                 }
+                 
+                  td {
+                      vertical-align: top;
+                 }
+                  tbody tr {
+                     /* border-bottom: 1px solid #dddddd;*/
+                 }
+                  tbody tr:nth-of-type(even) {
+                      background-color: #f3f3f3;
+                 }
+                 
+                  tbody tr:last-of-type {
+                      border-bottom: 2px solid #009879;
+                 }
+                 tr:hover {
+                    background-color: #d8d8d8!important;
                 }
-                .colselected {
               
-                    width: 10%; border: 5px solid #59c7fb;
-              
-              }
-              table tr th:first-child,table tr td:first-child {
-                    position: sticky;
-                    inset-inline-start: 0; 
-                    background-color: #36c!important;
-                    Color: #fff;
-                    font-weight: bolder;
-                    text-align: center;
-               }
-                </style></head><body> <div class='Title'>CA Export: $Tenantname - $Date </div>"
+              .selected:not(th){
+                  background-color:#eaf7ff!important;
+                  
+                  }
+                  th{
+                     background-color:white ;
+                  }
+                  .colselected {
+                
+                      width: 10%; border: 5px solid #59c7fb;
+                
+                }
+                table tr th:first-child,table tr td:first-child {
+                      position: sticky;
+                      inset-inline-start: 0; 
+                      background-color: #005494;
+                      border: 0px;
+                      Color: #fff;
+                      font-weight: bolder;
+                      text-align: center;
+                 }
+                 tbody tr:nth-of-type(even) td:first-child  {
+                      background-color: #547c9b;
+                 }
+                  tbody tr:nth-of-type(4),
+                  tbody tr:nth-of-type(7),
+                  tbody tr:nth-of-type(12),
+                  tbody tr:nth-of-type(23),
+                  tbody tr:nth-of-type(35) {
+                  background-color: #005494!important;
+                  }
+                 .navbar-custom { 
+                    background-color: #005494;
+                    color: white; 
+                    padding-bottom: 10px;
+                    
+                } 
+                /* Modify brand and text color */ 
+                
+                .navbar-custom .navbar-brand, 
+                .navbar-custom .navbar-text { 
+                    color: white; 
+                    padding-top: 70px;
+                    padding-bottom: 10px;
+                } 
+                </style></head><body> <nav class='navbar  fixed-top navbar-custom p-3 border-bottom'>
+                <div class='container-fluid'>
+                    <div class='col-sm' style='text-align:left'>
+                        <div class='row'><div><i class='fa fa-server' aria-hidden='true'></i></div><div class='ml-3'><strong>CA Export</strong></div></div>
+                    </div>
+                    <div class='col-sm' style='text-align:center'>
+                        <strong>$Tenantname</strong>
+                    </div>
+                    <div class='col-sm' style='text-align:right'>
+                    <strong>$Date</strong>
+                    </div>
+                </div>
+            </nav> "
                 
 
     Write-host "Launching: Web Browser"           
