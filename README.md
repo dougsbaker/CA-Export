@@ -22,7 +22,7 @@ The old Version will be located here
 
 The other Large Change in V2.0 is updateding the styling of the export so it is a little easier to read, and now the selects properly target the whole column. 
 
-![CaExport-Select](CaExport-Select.png)
+![Select](CAExport-Select.png)
 
 ### Thanks
 Special thanks to Andres Bohren @andresbohren for fixing some issues I had with graph and reminding me to keep my code up to date.  
