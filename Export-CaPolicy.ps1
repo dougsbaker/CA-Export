@@ -60,7 +60,7 @@ catch {
     Try {
         #Connect-AzureAD
         Select-MgProfile -Name "beta"
-        Connect-MgGraph -Scopes 'Policy.Read.All', 'Directory.Read.All', 'Application.Read.All'
+        Connect-MgGraph -Scopes 'Policy.Read.All', 'Directory.Read.All', 'Application.Read.All', 'Agreement.Read.All'
     }
     Catch {
         Write-host "Error: Please Install MgGraph Module" -ForegroundColor Yellow
