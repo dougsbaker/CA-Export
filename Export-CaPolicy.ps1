@@ -36,19 +36,15 @@
 [CmdletBinding()]
 param (
     [Parameter()]
-    [String]
-    $TenantID,
+    [String]$TenantID,
     # Parameter help description
     [Parameter()]
-    [String]
-    $PolicyID
+    [String]$PolicyID,
+    [Parameter()]
+    [String]$ExportLocation = $PWD
 )
-#ExportLocation
-#$ExportLocation = "C:\scripts\"
-$ExportLocation = $PSScriptRoot
+
 $FileName = "\CAPolicy.html"
-
-
 $HTMLExport = $true
 
 try {
