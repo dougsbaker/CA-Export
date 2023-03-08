@@ -37,13 +37,12 @@
 param (
     [Parameter()]
     [String]$TenantID,
-    # Parameter help description
     [Parameter()]
-    [String]$PolicyID,
-    [Parameter()]
-    [String]$ExportLocation = $PWD
+    [String]$PolicyID
 )
 
+$ExportLocation = $PSScriptRoot
+if (!$ExportLocation) {$ExportLocation = $PWD }
 $FileName = "\CAPolicy.html"
 $HTMLExport = $true
 
