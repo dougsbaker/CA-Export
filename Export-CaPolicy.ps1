@@ -42,7 +42,7 @@ param (
 )
 
 $ExportLocation = $PSScriptRoot
-if (!$ExportLocation) {$ExportLocation = $PWD }
+if (!$ExportLocation) { $ExportLocation = $PWD }
 $FileName = "\CAPolicy.html"
 $HTMLExport = $true
 
@@ -96,7 +96,11 @@ foreach ( $Policy in $CAPolicy) {
     $IncludeUG = $Policy.Conditions.Users.IncludeUsers
     $IncludeUG += $Policy.Conditions.Users.IncludeGroups
     $IncludeUG += $Policy.Conditions.Users.IncludeRoles
-
+    $DateCreated = $null
+    $DateCreated = $policy.CreatedDateTime
+    $DateModified = $null
+    $DateModified = $Policy.ModifiedDateTime
+    
 
     $ExcludeUG = $null
     $ExcludeUG = $Policy.Conditions.Users.ExcludeUsers
@@ -130,6 +134,7 @@ foreach ( $Policy in $CAPolicy) {
     $CAExport += New-Object PSObject -Property @{ 
         Name                            = $Policy.DisplayName;
         Status                          = $Policy.State;
+        DateModified                    = $DateModified;
         Users                           = "";
         UsersInclude                    = ($IncludeUG -join ", `r`n");
         UsersExclude                    = ($ExcludeUG -join ", `r`n");
@@ -152,7 +157,7 @@ foreach ( $Policy in $CAPolicy) {
         DevicesIncluded                 = ($InclDev -join ", `r`n");
         DevicesExcluded                 = ($ExclDev -join ", `r`n");
         DeviceFilters                   = ($devFilters -join ", `r`n");
-        'Grant Controls'               = "";
+        'Grant Controls'                = "";
         # Grant = ($Policy.GrantControls.BuiltInControls -join ", `r`n");
         Block                           = if ($Policy.GrantControls.BuiltInControls -contains "Block") { "True" } else { "" }
         'Require MFA'                   = if ($Policy.GrantControls.BuiltInControls -contains "Mfa") { "True" } else { "" }
@@ -166,15 +171,15 @@ foreach ( $Policy in $CAPolicy) {
         CustomControls                  = ($Policy.GrantControls.CustomAuthenticationFactors -join ", `r`n");
         GrantOperator                   = $Policy.GrantControls.Operator
         # Session = $Policy.SessionControls
-        'Session Controls'               = "";
+        'Session Controls'              = "";
         ApplicationEnforcedRestrictions = $Policy.SessionControls.ApplicationEnforcedRestrictions.IsEnabled
         CloudAppSecurity                = $Policy.SessionControls.CloudAppSecurity.IsEnabled
         SignInFrequency                 = "$($Policy.SessionControls.SignInFrequency.Value) $($conditionalAccessPolicy.SessionControls.SignInFrequency.Type)"
         PersistentBrowser               = $Policy.SessionControls.PersistentBrowser.Mode
         ContinuousAccessEvaluation      = $Policy.SessionControls.ContinuousAccessEvaluation.Mode
         ResiliantDefaults               = $policy.SessionControls.DisableResilienceDefaults
+        secureSignInSession             = $policy.SessionControls.AdditionalProperties.secureSignInSession.Values
     }
-  
     
 }
 
@@ -258,11 +263,11 @@ $Rows | ForEach-Object {
 
 
 #Set Row Order
-$sort = "Name", "Status", "Users", "UsersInclude", "UsersExclude", "Cloud apps or actions", "ApplicationsIncluded", "ApplicationsExcluded", `
+$sort = "Name", "Status", "DateModified", "Users", "UsersInclude", "UsersExclude", "Cloud apps or actions", "ApplicationsIncluded", "ApplicationsExcluded", `
     "userActions", "AuthContext", "Conditions", "UserRisk", "SignInRisk", "PlatformsInclude", "PlatformsExclude", "ClientApps", "LocationsIncluded", `
     "LocationsExcluded", "Devices", "DevicesIncluded", "DevicesExcluded", "DeviceFilters", "Grant Controls", "Block", "Require MFA", "Authentication Strength MFA", "CompliantDevice", `
     "DomainJoinedDevice", "CompliantApplication", "ApprovedApplication", "PasswordChange", "TermsOfUse", "CustomControls", "GrantOperator", `
-    "Session Controls",  "ApplicationEnforcedRestrictions", "CloudAppSecurity", "SignInFrequency", "PersistentBrowser",  "ContinuousAccessEvaluation", "ResiliantDefaults"
+    "Session Controls", "ApplicationEnforcedRestrictions", "CloudAppSecurity", "SignInFrequency", "PersistentBrowser", "ContinuousAccessEvaluation", "ResiliantDefaults", "secureSignInSession"
 
 #Debug
 #$pivot | Sort-Object $sort | Out-GridView           
@@ -372,11 +377,11 @@ if ($HTMLExport) {
                  tbody tr:nth-of-type(even) td:first-child  {
                       background-color: #547c9b;
                  }
-                  tbody tr:nth-of-type(4),
-                  tbody tr:nth-of-type(7),
-                  tbody tr:nth-of-type(12),
-                  tbody tr:nth-of-type(23),
-                  tbody tr:nth-of-type(35) {
+                  tbody tr:nth-of-type(5),
+                  tbody tr:nth-of-type(8),
+                  tbody tr:nth-of-type(13),
+                  tbody tr:nth-of-type(24),
+                  tbody tr:nth-of-type(36) {
                   background-color: #005494!important;
                   }
                  .navbar-custom { 
