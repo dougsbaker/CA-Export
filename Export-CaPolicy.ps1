@@ -54,7 +54,7 @@ catch {
     Write-host "Connecting: MgGraph"  
     Try {
         #Connect-AzureAD
-        Select-MgProfile -Name "beta"
+        #Select-MgProfile -Name "beta"
         Connect-MgGraph -Scopes 'Policy.Read.All', 'Directory.Read.All', 'Application.Read.All', 'Agreement.Read.All'
     }
     Catch {
@@ -76,7 +76,7 @@ if ($PolicyID) {
     $CAPolicy = Get-MgIdentityConditionalAccessPolicy -ConditionalAccessPolicyId $PolicyID
 }
 else {
-    $CAPolicy = Get-MgIdentityConditionalAccessPolicy -all
+    $CAPolicy = Get-MgIdentityConditionalAccessPolicy -all -ExpandProperty *
 
 }
 
