@@ -33,6 +33,7 @@
 
 
 #>
+
 [CmdletBinding()]
 param (
     [Parameter()]
@@ -55,7 +56,7 @@ catch {
     Try {
         #Connect-AzureAD
         #Select-MgProfile -Name "beta"
-        Connect-MgGraph -Scopes 'Policy.Read.All', 'Directory.Read.All', 'Application.Read.All', 'Agreement.Read.All'
+        Connect-MgGraph -Scopes 'Policy.Read.All', 'Directory.Read.All', 'Application.Read.All', 'Agreement.Read.All' -nowelcome
     }
     Catch {
         Write-host "Error: Please Install MgGraph Module" -ForegroundColor Yellow
@@ -84,6 +85,177 @@ $TenantData = Get-MgOrganization
 $TenantName = $TenantData.DisplayName
 $date = Get-Date
 
+
+Write-host "Extracting: Names from Guid's"
+#Swap User Guid With Names
+#Get Name
+$ADUsers = $CAPolicy.Conditions.Users.IncludeUsers
+$ADUsers += $CAPolicy.Conditions.Users.IncludeGroups
+$ADUsers += $CAPolicy.Conditions.Users.IncludeRoles
+$ADUsers += $CAPolicy.Conditions.Users.ExcludeUsers
+$ADUsers += $CAPolicy.Conditions.Users.ExcludeGroups
+$ADUsers += $CAPolicy.Conditions.Users.ExcludeRoles
+
+
+
+# Filter the $AdUsers array to include only valid GUIDs
+$ADsearch = $AdUsers | Where-Object {
+    ([Guid]::TryParse($_, [ref] [Guid]::Empty))
+}
+
+#users Hashtable
+$mgobjects = Get-MgDirectoryObjectById -ids $ADsearch 
+$mgObjectsLookup = @{}
+foreach ($obj in $mgobjects) {
+    $mgObjectsLookup[$obj.Id] = $obj.AdditionalProperties.displayName
+}
+
+
+#Change Guid's
+foreach ($policy in $caPolicy) {
+    # Check if the policy has Conditions and Users and ExcludeUsers properties
+    if ($policy.Conditions -and $policy.Conditions.Users <#-and $policy.Conditions.Users.ExcludeUsers#>) {
+        # Loop through each user in ExcludeUsers and replace with displayName if found in $mgObjectsLookup
+        for ($i = 0; $i -lt $policy.Conditions.Users.ExcludeUsers.Count; $i++) {
+            $userId = $policy.Conditions.Users.ExcludeUsers[$i]
+            if ($mgObjectsLookup.ContainsKey($userId)) {
+                $policy.Conditions.Users.ExcludeUsers[$i] = $mgObjectsLookup[$userId]
+            }
+        }
+
+        for ($i = 0; $i -lt $policy.Conditions.Users.IncludeUsers.Count; $i++) {
+            $userId = $policy.Conditions.Users.IncludeUsers[$i]
+            if ($mgObjectsLookup.ContainsKey($userId)) {
+                $policy.Conditions.Users.IncludeUsers[$i] = $mgObjectsLookup[$userId]
+            }
+        }
+        for ($i = 0; $i -lt $policy.Conditions.Users.IncludeGroups.Count; $i++) {
+            $userId = $policy.Conditions.Users.IncludeGroups[$i]
+            if ($mgObjectsLookup.ContainsKey($userId)) {
+                $policy.Conditions.Users.IncludeGroups[$i] = $mgObjectsLookup[$userId]
+            }
+        }
+        for ($i = 0; $i -lt $policy.Conditions.Users.ExcludeGroups.Count; $i++) {
+            $userId = $policy.Conditions.Users.ExcludeGroups[$i]
+            if ($mgObjectsLookup.ContainsKey($userId)) {
+                $policy.Conditions.Users.ExcludeGroups[$i] = $mgObjectsLookup[$userId]
+            }
+        }
+        for ($i = 0; $i -lt $policy.Conditions.Users.IncludeRoles.Count; $i++) {
+            $userId = $policy.Conditions.Users.IncludeRoles[$i]
+            if ($mgObjectsLookup.ContainsKey($userId)) {
+                $policy.Conditions.Users.IncludeRoles[$i] = $mgObjectsLookup[$userId]
+            }
+        }
+        for ($i = 0; $i -lt $policy.Conditions.Users.ExcludeRoles.Count; $i++) {
+            $userId = $policy.Conditions.Users.ExcludeRoles[$i]
+            if ($mgObjectsLookup.ContainsKey($userId)) {
+                $policy.Conditions.Users.ExcludeRoles[$i] = $mgObjectsLookup[$userId]
+            }
+        }
+    }
+   
+}
+
+#Swap App ID with name
+$MGApps = Get-MgServicePrincipal -All 
+#Hash Table
+$MGAppsLookup = @{}
+foreach ($obj in $MGApps) {
+    $MGAppsLookup[$obj.AppId] = "<div class='tooltip-container'>" + $obj.DisplayName + "<span class='tooltip-text'>App Id:" + $obj.AppId + "</span></div>"
+}
+#"<div class='tooltip-container'>" + $obj.DisplayName +"<span class='tooltip-text'>App Id:"+ $obj.AppId +"</span></div>"
+
+foreach ($policy in $caPolicy) {
+    if ($policy.Conditions -and $policy.Conditions.Applications) {
+
+        for ($i = 0; $i -lt $policy.Conditions.Applications.ExcludeApplications.Count; $i++) {
+            $AppId = $policy.Conditions.Applications.ExcludeApplications[$i]
+            if ($MGAppsLookup.ContainsKey($AppId)) {
+                $policy.Conditions.Applications.ExcludeApplications[$i] = $MGAppsLookup[$AppId]
+            }
+        }
+       
+        for ($i = 0; $i -lt $policy.Conditions.Applications.IncludeApplications.Count; $i++) {
+            $AppId = $policy.Conditions.Applications.IncludeApplications[$i]
+            if ($MGAppsLookup.ContainsKey($AppId)) {
+                $policy.Conditions.Applications.IncludeApplications[$i] = $MGAppsLookup[$AppId]
+            }
+        }
+    }
+   
+}
+
+#Swap Location with Names
+$mgLoc = Get-MgIdentityConditionalAccessNamedLocation
+$MGLocLookup = @{}
+foreach ($obj in $mgLoc) {
+    $MGLocLookup[$obj.Id] = $obj.DisplayName
+}
+foreach ($policy in $caPolicy) {
+    #Set Locations
+    if ($policy.Conditions -and $policy.Conditions.Locations) {
+        for ($i = 0; $i -lt $policy.Conditions.Locations.IncludeLocations.Count; $i++) {
+            $LocId = $policy.Conditions.Locations.IncludeLocations[$i]
+            if ($MGLocLookup.ContainsKey($LocId)) {
+                $policy.Conditions.Locations.IncludeLocations[$i] = $MGLocLookup[$LocId]
+            }
+        }
+        for ($i = 0; $i -lt $policy.Conditions.Locations.ExcludeLocations.Count; $i++) {
+            $LocId = $policy.Conditions.Locations.ExcludeLocations[$i]
+            if ($MGLocLookup.ContainsKey($LocId)) {
+                $policy.Conditions.Locations.ExcludeLocations[$i] = $MGLocLookup[$LocId]
+            }
+        }
+    }
+ 
+}
+
+#Switch TOU Id for Name
+$mgTou = Get-MgAgreement 
+$MGTouLookup = @{}
+foreach ($obj in $mgTou) {
+    $MGTouLookup[$obj.Id] = $obj.DisplayName
+}
+foreach ($policy in $caPolicy) {
+    if ($policy.GrantControls -and $policy.GrantControls.TermsOfUse) {
+              
+        for ($i = 0; $i -lt $policy.GrantControls.TermsOfUse.Count; $i++) {
+            $TouId = $policy.GrantControls.TermsOfUse[$i]
+            if ($MGTouLookup.ContainsKey($TouId)) {
+                $policy.GrantControls.TermsOfUse[$i] = $MGTouLookup[$TouId]
+            }
+        }
+    }
+}
+#swap Admin Roles
+$mgRole = Get-MgDirectoryRoleTemplate 
+$mgRoleLookup = @{}
+foreach ($obj in $mgRole) {
+    $mgRoleLookup[$obj.Id] = $obj.DisplayName
+}
+foreach ($policy in $caPolicy) {
+    if ($policy.Conditions.Users -and $policy.Conditions.Users.IncludeRoles) {
+              
+        for ($i = 0; $i -lt $policy.Conditions.Users.IncludeRoles.Count; $i++) {
+            $RoleId = $policy.Conditions.Users.IncludeRoles[$i]
+            if ($mgRoleLookup.ContainsKey($RoleId)) {
+                $policy.Conditions.Users.IncludeRoles[$i] = $mgRoleLookup[$RoleId]
+            }
+        }
+    }
+    if ($policy.Conditions.Users -and $policy.Conditions.Users.ExcludeRoles) {
+              
+        for ($i = 0; $i -lt $policy.Conditions.Users.ExcludeRoles.Count; $i++) {
+            $RoleId = $policy.Conditions.Users.ExcludeRoles[$i]
+            if ($mgRoleLookup.ContainsKey($RoleId)) {
+                $policy.Conditions.Users.ExcludeRoles[$i] = $mgRoleLookup[$RoleId]
+            }
+        }
+    }
+}
+
+# exit
 $CAExport = [PSCustomObject]@()
 
 $AdUsers = @()
@@ -111,9 +283,6 @@ foreach ( $Policy in $CAPolicy) {
     $Apps += $Policy.Conditions.Applications.IncludeApplications
     $Apps += $Policy.Conditions.Applications.ExcludeApplications
 
-    
-    $AdUsers += $ExcludeUG
-    $AdUsers += $IncludeUG
     
     $InclLocation = $Null
     $ExclLocation = $Null 
@@ -183,47 +352,6 @@ foreach ( $Policy in $CAPolicy) {
     
 }
 
-#Swith user/group Guid to display names
-Write-host "Converting: AzureAD Guid"
-#Filter out Objects
-$ADsearch = $AdUsers | Where-Object { $_ -ne 'All' -and $_ -ne 'GuestsOrExternalUsers' -and $_ -ne 'None' }
-$cajson = $CAExport | ConvertTo-Json -Depth 4
-$AdNames = @{}
-Get-MgDirectoryObjectById -ids $ADsearch | ForEach-Object { 
-    $obj = $_.Id
-    $disp = $_.AdditionalProperties.displayName
-    $AdNames.$obj = $disp
-    $cajson = $cajson -replace "$obj", "$disp"
-}
-$CAExport = $cajson | ConvertFrom-Json
-#Switch Apps Guid with Display names
-$allApps = Get-MgServicePrincipal -All
-$allApps | Where-Object { $_.AppId -in $Apps } | ForEach-Object {
-    $obj = $_.AppId
-    $disp = $_.DisplayName
-    $cajson = $cajson -replace "$obj", "$disp"
-}
-#switch named location Guid for Display Names
-Get-MgIdentityConditionalAccessNamedLocation | ForEach-Object {
-    $obj = $_.Id
-    $disp = $_.DisplayName
-    $cajson = $cajson -replace "$obj", "$disp"
-}
-#Switch TOU Id for display name
-Get-MgAgreement | ForEach-Object {
-    $obj = $_.Id
-    $disp = $_.DisplayName
-    $cajson = $cajson -replace "$obj", "$disp"
-}
-
-#Switch Roles Guid to Names
-#Get-MgDirectoryRole | ForEach-Object{
-Get-MgDirectoryRoleTemplate | ForEach-Object {
-    $obj = $_.Id
-    $disp = $_.DisplayName
-    $cajson = $cajson -replace "$obj", "$disp"
-}
-$CAExport = $cajson | ConvertFrom-Json
 
 #Export Setup
 Write-host "Pivoting: CA to Export Format"
@@ -398,6 +526,34 @@ if ($HTMLExport) {
                     padding-top: 70px;
                     padding-bottom: 10px;
                 } 
+                       /* Tooltip container */
+        .tooltip-container {
+            position: relative;
+            display: inline-block;
+        }
+
+        /* Tooltip text */
+        .tooltip-text {
+            visibility: hidden;
+            width: 200px;
+            background-color: black;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px 0;
+            position: absolute;
+            z-index: 1;
+            bottom: 115%; /* Position the tooltip above the text */
+            left: 50%;
+            margin-left: -100px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .tooltip-container:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
                 </style></head><body> <nav class='navbar  fixed-top navbar-custom p-3 border-bottom'>
                 <div class='container-fluid'>
                     <div class='col-sm' style='text-align:left'>
@@ -416,6 +572,7 @@ if ($HTMLExport) {
     Write-host "Launching: Web Browser"           
     $Launch = $ExportLocation + $FileName
     $HTML += $pivot  | Where-Object { $_."CA Item" -ne 'row1' } | Sort-object { $sort.IndexOf($_."CA Item") } | convertto-html -Fragment
-    $HTML | Out-File $Launch
+    Add-Type -AssemblyName System.Web
+    [System.Web.HttpUtility]::HtmlDecode($HTML) | Out-File $Launch
     start-process $Launch
 }
