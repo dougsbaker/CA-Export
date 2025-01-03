@@ -543,7 +543,7 @@ if ($HTMLExport) {
             padding: 5px 0;
             position: absolute;
             z-index: 1;
-            bottom: 115%; /* Position the tooltip above the text */
+            top: 115%; /* Position the tooltip below the text */
             left: 50%;
             margin-left: -100px;
             opacity: 0;
