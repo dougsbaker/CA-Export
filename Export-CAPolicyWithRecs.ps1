@@ -244,6 +244,7 @@ foreach ( $Policy in $CAPolicy) {
     $IncludeUG = $Policy.Conditions.Users.IncludeUsers
     $IncludeUG += $Policy.Conditions.Users.IncludeGroups
     $IncludeUG += $Policy.Conditions.Users.IncludeRoles
+    $IncludeUG += $policy.conditions.users.IncludeGuestsOrExternalUsers.GuestOrExternalUserTypes -replace ',', ', '
     $DateCreated = $null
     $DateCreated = $policy.CreatedDateTime
     $DateModified = $null
@@ -254,6 +255,7 @@ foreach ( $Policy in $CAPolicy) {
     $ExcludeUG = $Policy.Conditions.Users.ExcludeUsers
     $ExcludeUG += $Policy.Conditions.Users.ExcludeGroups
     $ExcludeUG += $Policy.Conditions.Users.ExcludeRoles
+    $ExcludeUG += $policy.conditions.users.ExcludeGuestsOrExternalUsers.GuestOrExternalUserTypes -replace ',', ', '
     
     
     $Apps += $Policy.Conditions.Applications.IncludeApplications
@@ -302,6 +304,7 @@ foreach ( $Policy in $CAPolicy) {
         DevicesIncluded                 = ($InclDev -join ", `r`n");
         DevicesExcluded                 = ($ExclDev -join ", `r`n");
         DeviceFilters                   = ($devFilters -join ", `r`n");
+        AuthenticationFlows             = $Policy.Conditions.AdditionalProperties.authenticationFlows.Values;
         'Grant Controls'                = "";
         # Grant = ($Policy.GrantControls.BuiltInControls -join ", `r`n");
         Block                           = if ($Policy.GrantControls.BuiltInControls -contains "Block") { "True" } else { "" }
@@ -500,6 +503,44 @@ $recommendations = @(
         @{}, 
         $true, 
         $false
+    ),
+    [Recommendation]::new(
+        "CA-09", 
+        "Implement Risk-Based Policy", 
+        "There is at least 1 policy that addresses risk-based conditional access.", 
+        "Consider implementing risk-based conditional access policies to enhance security by dynamically applying access controls based on the risk level of the sign-in or user.", 
+        "Risk-based policies help in dynamically assessing the risk level of sign-ins and users, and applying appropriate access controls to mitigate potential threats. This ensures that high-risk activities are subject to stricter controls, thereby enhancing the overall security posture.", 
+        @{
+            "Risk-Based Conditional Access Overview"  = "https://learn.microsoft.com/en-us/entra/id-protection/howto-identity-protection-configure-risk-policies"
+            "Require MFA for Risky Sign-in"           = "https://learn.microsoft.com/en-us/entra/identity/conditional-access/policy-risk-based-sign-in#enable-with-conditional-access-policy"
+            "Require Passsword Change for Risky USer" = "https://learn.microsoft.com/en-us/entra/identity/conditional-access/policy-risk-based-user#enable-with-conditional-access-policy"
+        }, 
+        $false, 
+        $true
+    ),
+    [Recommendation]::new(
+        "CA-10", 
+        "Block Device Code Flow", 
+        "There is at least 1 policy that blocks device code flow.", 
+        "Consider implementing a policy to block device code flow to enhance security by preventing unauthorized access through device code authentication.", 
+        "Blocking device code flow helps in preventing unauthorized access through device code authentication, which can be exploited by attackers. Implementing this policy ensures that only secure authentication methods are used.", 
+        @{
+            "Block Device Code Flow Overview" = "https://learn.microsoft.com/en-us/entra/identity/conditional-access/concept-authentication-flows#device-code-flow"
+        }, 
+        $false, 
+        $true
+    ),
+    [Recommendation]::new(
+        "CA-11", 
+        "Require MFA to Enroll a Device in Intune", 
+        "There is at least 1 policy that requires Multi-Factor Authentication (MFA) to enroll a device in Intune.", 
+        "Consider implementing a policy to require Multi-Factor Authentication (MFA) for enrolling devices in Intune to enhance security.", 
+        "Requiring MFA for device enrollment in Intune ensures that only authorized users can enroll devices, thereby enhancing the security of your organization's mobile device management.", 
+        @{
+            "MFA for Intune Enrollment Overview" = "https://learn.microsoft.com/en-us/mem/intune/enrollment/multi-factor-authentication"
+        }, 
+        $false, 
+        $true
     )
 )
 
@@ -683,10 +724,10 @@ $CheckFunctions = @{
         ($PolicyCheck.Conditions.Users.IncludeRoles | ForEach-Object { $PolicyCheck.Conditions.Users.ExcludeRoles -contains $_ })) -or
         ($PolicyCheck.Conditions.Platforms.IncludePlatforms -ne $null -and $PolicyCheck.Conditions.Platforms.ExcludePlatforms -ne $null -and 
         ($PolicyCheck.Conditions.Platforms.IncludePlatforms | ForEach-Object { $PolicyCheck.Conditions.Platforms.ExcludePlatforms -contains $_ })) -or
-        ($PolicyCheck.Conditions.ClientApplications.IncludeClientApplications -ne $null -and $PolicyCheck.Conditions.ClientApplications.ExcludeClientApplications -ne $null -and 
-        ($PolicyCheck.Conditions.ClientApplications.IncludeClientApplications | ForEach-Object { $PolicyCheck.Conditions.ClientApplications.ExcludeClientApplications -contains $_ })) -or
-        ($PolicyCheck.Conditions.Locations.IncludeLocations -ne $null -and $PolicyCheck.Conditions.Locations.ExcludeLocations -ne $null -and 
-        ($PolicyCheck.Conditions.Locations.IncludeLocations | ForEach-Object { $PolicyCheck.Conditions.Locations.ExcludeLocations -contains $_ }))
+              ($PolicyCheck.Conditions.Locations.IncludeLocations -ne $null -and $PolicyCheck.Conditions.Locations.ExcludeLocations -ne $null -and 
+        ($PolicyCheck.Conditions.Locations.IncludeLocations | ForEach-Object { $PolicyCheck.Conditions.Locations.ExcludeLocations -contains $_ })) -or
+        ($PolicyCheck.Conditions.Applications.IncludeApplications -ne $null -and $PolicyCheck.Conditions.Applications.ExcludeApplications -ne $null -and 
+            ($PolicyCheck.Conditions.Applications.IncludeApplications | ForEach-Object { $PolicyCheck.Conditions.Applications.ExcludeApplications -contains $_ }))
     }
     "CA-07" = {
         param($PolicyCheck)
@@ -702,8 +743,23 @@ $CheckFunctions = @{
         $PolicyCheck.Conditions.Users.IncludeUsers -ne "All" -and 
         $PolicyCheck.Conditions.Users.IncludeUsers -ne "GuestsOrExternalUsers"
     }
-    
+    "CA-09" = {
+        param($PolicyCheck)
+        ($PolicyCheck.Conditions.SignInRiskLevels -ne $null) -or
+        ($PolicyCheck.Conditions.UserRiskLevels -ne $null)
+    }
+    "CA-10" = {
+        param($PolicyCheck)
+        $PolicyCheck.Conditions.AdditionalProperties.authenticationFlows.Values -split ',' -contains "deviceCodeFlow" -and
+        $PolicyCheck.grantcontrols.BuiltInControls -contains "Block"
+    }
+    "CA-11" = {
+        param($PolicyCheck)
+        ($PolicyCheck.Conditions.Applications.IncludeUserActions -contains "urn:user:registerdevice") -and
+        ($PolicyCheck.GrantControls.BuiltInControls -contains "Mfa")
+    }
 }
+
 
 foreach ($policy in $CAPolicy) {
     foreach ($recommendation in $recommendations) {
@@ -718,7 +774,7 @@ foreach ($policy in $CAPolicy) {
 #Set Row Order
 $sort = "Name", "Status", "DateModified", "Users", "UsersInclude", "UsersExclude", "Cloud apps or actions", "ApplicationsIncluded", "ApplicationsExcluded", `
     "userActions", "AuthContext", "Conditions", "UserRisk", "SignInRisk", "PlatformsInclude", "PlatformsExclude", "ClientApps", "LocationsIncluded", `
-    "LocationsExcluded", "Devices", "DevicesIncluded", "DevicesExcluded", "DeviceFilters", "Grant Controls", "Block", "Require MFA", "Authentication Strength MFA", "CompliantDevice", `
+    "LocationsExcluded", "Devices", "DevicesIncluded", "DevicesExcluded", "DeviceFilters", "AuthenticationFlows", "Grant Controls", "Block", "Require MFA", "Authentication Strength MFA", "CompliantDevice", `
     "DomainJoinedDevice", "CompliantApplication", "ApprovedApplication", "PasswordChange", "TermsOfUse", "CustomControls", "GrantOperator", `
     "Session Controls", "ApplicationEnforcedRestrictions", "CloudAppSecurity", "SignInFrequency", "PersistentBrowser", "ContinuousAccessEvaluation", "ResiliantDefaults", "secureSignInSession"
 
@@ -749,15 +805,15 @@ function Display-RecommendationsAsHTMLFragment {
             <div class='control'>$($rec.Control)</div>
            
         </div>
-        <div>$($rec.Importance)</div>
-        <div><strong>Links:</strong>
+        <div class='recommendation-description'>$($rec.Importance)</div>
+        <div class='recommendation-links'><strong>Links:</strong>
             <div class='links'>
                 $links
             </div>
         </div>    
         
           
-        <div>$RecStatusNote</div>
+        <div class='recommendation-comment'>$RecStatusNote</div>
         
         <div>$($rec.Note)</div>
         
@@ -913,8 +969,8 @@ if ($HTMLExport) {
                     tbody tr:nth-of-type(5),
                     tbody tr:nth-of-type(8),
                     tbody tr:nth-of-type(13),
-                    tbody tr:nth-of-type(24),
-                    tbody tr:nth-of-type(36) {
+                    tbody tr:nth-of-type(25),
+                    tbody tr:nth-of-type(37) {
                         background-color: #005494 !important;
                     }
                     .tooltip-container {
