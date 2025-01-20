@@ -555,7 +555,7 @@ function Update-PolicyStatus {
         $Recommendation.Value.Status = $Recommendation.Value.SwapStatus
     }
 
-    if ($Recommendation.Value.Status) {
+    if ($Recommendation.Value.Status -and $PolicyCheck.state -eq "enabled") {
         $Status1 = "policy-item success"
         $Status2 = "status-icon-large success"
         $Status3 = "fas fa-check-circle"
@@ -601,6 +601,7 @@ function Update-PolicyStatus {
         <div class='$($Status1)'>
             <div class='policy-header'>
                 <strong>$($PolicyCheck.DisplayName)</strong>
+                <div class='recommendation-status'>Status: $($PolicyCheck.state)</div>
                 <div class='$($Status2)'><i class='$($Status3)'></i></div>
             </div>
             <div class='policy-content'>
@@ -803,6 +804,7 @@ function Display-RecommendationsAsHTMLFragment {
         <div class='header'>
             <div class='title'>$($rec.Name)</div>
             <div class='control'>$($rec.Control)</div>
+            
            
         </div>
         <div class='recommendation-description'>$($rec.Importance)</div>
