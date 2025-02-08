@@ -277,6 +277,9 @@ foreach ( $Policy in $CAPolicy) {
     $ExclDev = $Policy.Conditions.Devices.ExcludeDevices
     $devFilters = $null
     $devFilters = $Policy.Conditions.Devices.DeviceFilter.Rule
+
+    $authenticationFlowsString = $Policy.Conditions.AdditionalProperties.authenticationFlows.Values -join ', '
+    
  
     $CAExport += New-Object PSObject -Property @{ 
         Name                            = $Policy.DisplayName;
@@ -304,7 +307,7 @@ foreach ( $Policy in $CAPolicy) {
         DevicesIncluded                 = ($InclDev -join ", `r`n");
         DevicesExcluded                 = ($ExclDev -join ", `r`n");
         DeviceFilters                   = ($devFilters -join ", `r`n");
-        AuthenticationFlows             = $Policy.Conditions.AdditionalProperties.authenticationFlows.Values;
+        AuthenticationFlows             = $authenticationFlowsString ;
         'Grant Controls'                = "";
         # Grant = ($Policy.GrantControls.BuiltInControls -join ", `r`n");
         Block                           = if ($Policy.GrantControls.BuiltInControls -contains "Block") { "True" } else { "" }
@@ -612,7 +615,7 @@ function Update-PolicyStatus {
                     <div class='include-content'>
                         <b>Users:</b> $($CheckIncUG -join ', ')
                         <br> 
-                        <b>Applications:</b> $($PolicyCheck.Conditions.Applications.IncludeApplications -join ', ')
+                        <b>Application/Actions:</b> $($PolicyCheck.Conditions.Applications.IncludeApplications -join ', ') $($PolicyCheck.Conditions.Applications.IncludeUserActions -join ', ')
                         <br> 
                         <b>Conditions:</b> $($CheckIncCond -join ', ')
                     </div>
