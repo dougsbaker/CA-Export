@@ -544,6 +544,18 @@ $recommendations = @(
         }, 
         $false, 
         $true
+    ),
+    [Recommendation]::new(
+        "CA-12", 
+        "Block Unknown/Unsupported Devices", 
+        "There is no policy that blocks unknown or unsupported devices.", 
+        "Consider implementing a policy to block unknown or unsupported devices to enhance security by preventing unauthorized access from devices that do not meet your organization's security standards.", 
+        "Blocking unknown or unsupported devices helps in preventing unauthorized access from devices that may not comply with your organization's security policies. Implementing this policy ensures that only secure and compliant devices can access organizational resources.", 
+        @{
+            "Block Unknown/Unsupported Devices Overview" = "https://learn.microsoft.com/en-us/entra/identity/conditional-access/policy-all-users-device-unknown-unsupported"
+        }, 
+        $false, 
+        $true
     )
 )
 
@@ -762,6 +774,12 @@ $CheckFunctions = @{
         ($PolicyCheck.Conditions.Applications.IncludeUserActions -contains "urn:user:registerdevice") -and
         ($PolicyCheck.GrantControls.BuiltInControls -contains "Mfa")
     }
+    "CA-12" = {
+        param($PolicyCheck)
+        ($PolicyCheck.GrantControls.BuiltInControls -contains "Block") -and
+        ($PolicyCheck.Conditions.Platforms.IncludePlatforms -contains "all") -and
+        ($PolicyCheck.Conditions.Platforms.ExcludePlatforms.Count -gt 0)
+    }
 }
 
 
@@ -791,7 +809,7 @@ function Display-RecommendationsAsHTMLFragment {
     )
 
     $htmlFragment = @"
-<div class='recommendations' id='ca-security-checks' style='display: none;'>
+<div class='recommendations' id='ca-security-checks' style=''>
 "@
 
     foreach ($rec in $Recommendations) {
@@ -855,7 +873,7 @@ if ($HTMLExport) {
         });
         $(document).ready(function() {
         $("#toggle-icon").click(function() {
-            $("table").toggle();
+            $("#ca-export").toggle();
             $("#ca-security-checks").toggle();
         });
         }); 
@@ -1208,7 +1226,9 @@ if ($HTMLExport) {
     Write-host "Launching: Web Browser"           
     $Launch = $ExportLocation + $FileName
     $LaunchJson = $ExportLocation + $JsonFileName
+    $HTML += "<div class='policy-export' id='ca-export' style='display: none;'>"
     $HTML += $pivot  | Where-Object { $_."CA Item" -ne 'row1' } | Sort-object { $sort.IndexOf($_."CA Item") } | convertto-html -Fragment
+    $html += "</div>"
     $html += $SecurityCheck
     Add-Type -AssemblyName System.Web
     [System.Web.HttpUtility]::HtmlDecode($HTML) | Out-File $Launch
