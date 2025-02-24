@@ -55,6 +55,7 @@ The recommendations script checks for the following items:
 13. Block Unknown/Unsupported Devices
 
 Sample output
+![CaExport-rec](CaExport-rec.png)
 ![CaExport-result](CaExport-result.png)
 
 ## What is new?
