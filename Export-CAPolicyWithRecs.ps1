@@ -1,17 +1,47 @@
+<#
+.SYNOPSIS
+    Export Conditional Access Policies with Recommendations.
+
+.DESCRIPTION
+    This script exports Conditional Access (CA) policies from Azure AD to an HTML file. 
+    It includes recommendations and checks for each policy to enhance security.
+
+.EXAMPLE
+.\Export-CAPolicyWithRecs.ps1
+
+This example runs the script and exports all Conditional Access policies with recommendations.
+
+.NOTES
+    Author:  Douglas Baker
+             @dougsbaker
+    Version: 3.0
+
+
+Output report uses open source components for HTML formatting
+- bootstrap - MIT License - https://getbootstrap.com/docs/4.0/about/license/
+- fontawesome - CC BY 4.0 License - https://fontawesome.com/license/free
+
+############################################################################
+This sample script is not supported under any standard support program or service. 
+This sample script is provided AS IS without warranty of any kind. 
+This work is licensed under a Creative Commons Attribution 4.0 International License
+https://creativecommons.org/licenses/by-nc-sa/4.0/
+############################################################################    
+
+#>
 
 [CmdletBinding()]
 param (
-    [Parameter()]
-    [String]$TenantID,
     [Parameter()]
     [String]$PolicyID
 )
 
 $ExportLocation = $PSScriptRoot
 if (!$ExportLocation) { $ExportLocation = $PWD }
-$FileName = "\CAPolicyV2.html"
-$JsonFileName = "\CAPolicyV2.json"
+$FileName = "\CAPolicy.html"
+$JsonFileName = "\CAPolicy.json"
 $HTMLExport = $true
+$JsonExport = $false
 
 
 
@@ -855,30 +885,31 @@ function Display-RecommendationsAsHTMLFragment {
 if ($HTMLExport) {
     Write-host "Saving to File: HTML"
     $jquery = '  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
-    <script>
-    $(document).ready(function(){
-        $("tr").click(function(){
-            if(!$(this).hasClass("selected")){
-                $(this).addClass("selected");
-            } else {
-                $(this).removeClass("selected");
-            }
+        <script>
+        $(document).ready(function(){
+            $("tr").click(function(){
+                if(!$(this).hasClass("selected")){
+                    $(this).addClass("selected");
+                } else {
+                    $(this).removeClass("selected");
+                }
+            });
+            
+            $("th").click(function(){
+                // Get the index of the clicked column
+                var colIndex = $(this).index();
+                // Select the corresponding col element and add or remove the class
+                $("colgroup col").eq(colIndex).toggleClass("colselected");
+            });
+            $(document).ready(function() {
+            $("#toggle-icon").click(function() {
+                $("#ca-export").toggle();
+                $("#ca-security-checks").toggle();
+                $("html, body").animate({ scrollTop: 0 }, "slow");
+            });
+            }); 
         });
-        
-        $("th").click(function(){
-            // Get the index of the clicked column
-            var colIndex = $(this).index();
-            // Select the corresponding col element and add or remove the class
-            $("colgroup col").eq(colIndex).toggleClass("colselected");
-        });
-        $(document).ready(function() {
-        $("#toggle-icon").click(function() {
-            $("#ca-export").toggle();
-            $("#ca-security-checks").toggle();
-        });
-        }); 
-    });
-    </script>'
+        </script>'
     $style = @"
     /* General Styles */
                     html, body {
@@ -1213,7 +1244,7 @@ if ($HTMLExport) {
                 </head><body> <nav class='navbar  fixed-top navbar-custom p-3 border-bottom'>
                 <div class='container-fluid'>
                     <div class='col-sm' style='text-align:left'>
-                        <div class='row'><div><i class='fa fa-server' aria-hidden='true'></i></div><div class='ml-3'><strong>CA Export</strong></div><div class='ml-3' id='toggle-icon' style='cursor: pointer;'><i class='fas fa-exchange-alt'></i></div>
+                        <div class='row'><div><i class='fa fa-server' aria-hidden='true'></i></div><div class='ml-3'><strong>CA Export</strong></div><div class='ml-3' id='toggle-icon' style='cursor: pointer;'><i class='fas fa-exchange-alt'></i> Change View</div>
 </div>
                     </div>
                     <div class='col-sm' style='text-align:center'>
@@ -1229,14 +1260,18 @@ if ($HTMLExport) {
 
     Write-host "Launching: Web Browser"           
     $Launch = $ExportLocation + $FileName
-    $LaunchJson = $ExportLocation + $JsonFileName
     $HTML += "<div class='policy-export' id='ca-export' style='display: none;'>"
     $HTML += $pivot  | Where-Object { $_."CA Item" -ne 'row1' } | Sort-object { $sort.IndexOf($_."CA Item") } | convertto-html -Fragment
     $html += "</div>"
     $html += $SecurityCheck
     Add-Type -AssemblyName System.Web
     [System.Web.HttpUtility]::HtmlDecode($HTML) | Out-File $Launch
-    $CAPolicy | ConvertTo-Json -Depth 8 | Out-File $LaunchJson
-    $LaunchJson
+   
     start-process $Launch
+}
+if ($JsonExport) {
+    Write-host "Saving to File: JSON" 
+    $LaunchJson = $ExportLocation + $JsonFileName
+    $CAPolicy | ConvertTo-Json -Depth 8 | Out-File $LaunchJson
+    start-process $LaunchJson
 }
