@@ -39,7 +39,7 @@ $TenantData = Get-MgOrganization
 $TenantName = $TenantData.DisplayName
 $date = Get-Date
 Write-Host "Connected: $TenantName tenant"
-
+$LinkURL = "https://portal.azure.com/#view/Microsoft_AAD_ConditionalAccess/PolicyBlade/policyId/"
 
 #Collect CA Policy
 Write-host "Exporting: CA Policy"
@@ -615,7 +615,7 @@ function Update-PolicyStatus {
     <div class='policy'>
         <div class='$($Status1)'>
             <div class='policy-header'>
-                <strong>$($PolicyCheck.DisplayName)</strong>
+                <strong>$($PolicyCheck.DisplayName) <a href='$($LinkURL)$($PolicyCheck.Id)' target='_blank'><i class='fas fa-external-link-alt'></i></a></strong>
                 <div class='recommendation-status'>Status: $($PolicyCheck.state)</div>
                 <div class='$($Status2)'><i class='$($Status3)'></i></div>
             </div>
@@ -1188,6 +1188,10 @@ if ($HTMLExport) {
 
                     .status-icon-large.error {
                         color: red;
+                    }
+
+                    .fa-external-link-alt {
+                        color: black;
                     }
 
 
