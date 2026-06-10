@@ -1,33 +1,49 @@
 <#
 .SYNOPSIS
-    Export Conditional Access Policies with Recommendations.
+    Exports Entra ID Conditional Access policies to an HTML report with security recommendations.
 
 .DESCRIPTION
-    This script exports Conditional Access (CA) policies from Azure AD to an HTML file. 
-    It includes recommendations and checks for each policy to enhance security.
+    Connects to Microsoft Graph and exports Conditional Access (CA) policies to a formatted HTML
+    report. GUIDs are resolved to display names for users, groups, roles, applications, named
+    locations, and Terms of Use. The report includes per-policy security checks and actionable
+    recommendations based on Microsoft best practices.
+
+    Required Microsoft Graph scopes:
+        Policy.Read.All, Directory.Read.All, Application.Read.All,
+        Agreement.Read.All, GroupMember.Read.All
+
+    Required module:
+        Microsoft.Graph (Install-Module Microsoft.Graph)
+
+.PARAMETER PolicyID
+    The GUID of a single Conditional Access policy to export. If omitted, all policies
+    in the tenant are exported.
 
 .EXAMPLE
-.\Export-CAPolicyWithRecs.ps1
+    .\Export-CAPolicyWithRecs.ps1
 
-This example runs the script and exports all Conditional Access policies with recommendations.
+    Exports all Conditional Access policies to CAPolicy.html in the script directory.
+
+.EXAMPLE
+    .\Export-CAPolicyWithRecs.ps1 -PolicyID 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+
+    Exports a single policy by its object ID.
 
 .NOTES
-    Author:  Douglas Baker
-             @dougsbaker
-    Version: 3.0
+    Author:   Douglas Baker (@dougsbaker)
+    Version:  3.1
+    License:  Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International
+              https://creativecommons.org/licenses/by-nc-sa/4.0/
 
+    This script is provided AS IS without warranty of any kind and is not supported
+    under any standard support program or service.
 
-Output report uses open source components for HTML formatting
-- bootstrap - MIT License - https://getbootstrap.com/docs/4.0/about/license/
-- fontawesome - CC BY 4.0 License - https://fontawesome.com/license/free
+    Open-source components used in the HTML report:
+        Bootstrap 4  - MIT License        - https://getbootstrap.com/docs/4.0/about/license/
+        Font Awesome - CC BY 4.0 License  - https://fontawesome.com/license/free
 
-############################################################################
-This sample script is not supported under any standard support program or service. 
-This sample script is provided AS IS without warranty of any kind. 
-This work is licensed under a Creative Commons Attribution 4.0 International License
-https://creativecommons.org/licenses/by-nc-sa/4.0/
-############################################################################    
-
+.LINK
+    https://learn.microsoft.com/en-us/entra/identity/conditional-access/overview
 #>
 
 [CmdletBinding()]
@@ -46,23 +62,42 @@ $JsonExport = $false
 
 
 
-try {
-    Get-MgIdentityConditionalAccessPolicy -ErrorAction Stop > $null
-    Write-host "Connected: MgGraph"
-}
-catch {
-    Write-host "Connecting: MgGraph"  
-    Try {
-        #Connect-AzureAD
-        #Select-MgProfile -Name "beta"
-        Connect-MgGraph -Scopes 'Policy.Read.All', 'Directory.Read.All', 'Application.Read.All', 'Agreement.Read.All' -nowelcome
+$RequiredScopes = @(
+    'Policy.Read.All',
+    'Directory.Read.All',
+    'Application.Read.All',
+    'Agreement.Read.All',
+    'GroupMember.Read.All'
+)
+
+$context = Get-MgContext
+$missingScopes = $RequiredScopes | Where-Object { $context.Scopes -notcontains $_ }
+
+if ($null -eq $context -or $missingScopes.Count -gt 0) {
+    if ($null -ne $context -and $missingScopes.Count -gt 0) {
+        Write-Host "Connected but missing required scopes: $($missingScopes -join ', ')" -ForegroundColor Yellow
+        Write-Host "Reconnecting with required scopes..." -ForegroundColor Yellow
+    } else {
+        Write-Host "Connecting: MgGraph"
     }
-    Catch {
-        Write-host "Error: Please Install MgGraph Module" -ForegroundColor Yellow
+    try {
+        Connect-MgGraph -Scopes $RequiredScopes -NoWelcome -ErrorAction Stop
+    } catch {
+        Write-Host "Error: Failed to connect. Ensure the Microsoft.Graph module is installed." -ForegroundColor Red
         Write-Host "Run: Install-Module Microsoft.Graph" -ForegroundColor Yellow
         Exit
     }
+
+    $context = Get-MgContext
+    $stillMissing = $RequiredScopes | Where-Object { $context.Scopes -notcontains $_ }
+    if ($stillMissing.Count -gt 0) {
+        Write-Host "Error: The following required scopes were not granted: $($stillMissing -join ', ')" -ForegroundColor Red
+        Write-Host "Ensure your account or app registration has the necessary permissions." -ForegroundColor Yellow
+        Exit
+    }
 }
+
+Write-Host "Connected: MgGraph (Tenant: $($context.TenantId))"
 
 
 $TenantData = Get-MgOrganization
