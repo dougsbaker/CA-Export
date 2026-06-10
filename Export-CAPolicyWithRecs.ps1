@@ -116,10 +116,6 @@ else {
 
 }
 
-$TenantData = Get-MgOrganization
-$TenantName = $TenantData.DisplayName
-$date = Get-Date
-
 
 Write-host "Extracting: Names from Guid's"
 #Swap User Guid With Names
@@ -299,8 +295,6 @@ foreach ($policy in $caPolicy) {
 # exit
 $CAExport = [PSCustomObject]@()
 
-$AdUsers = @()
-$Apps = @()
 #Extract Values
 Write-host "Extracting: CA Policy Data"
 foreach ( $Policy in $CAPolicy) {
@@ -310,8 +304,6 @@ foreach ( $Policy in $CAPolicy) {
     $IncludeUG += $Policy.Conditions.Users.IncludeGroups
     $IncludeUG += $Policy.Conditions.Users.IncludeRoles
     $IncludeUG += $policy.conditions.users.IncludeGuestsOrExternalUsers.GuestOrExternalUserTypes -replace ',', ', '
-    $DateCreated = $null
-    $DateCreated = $policy.CreatedDateTime
     $DateModified = $null
     $DateModified = $Policy.ModifiedDateTime
     
@@ -322,11 +314,7 @@ foreach ( $Policy in $CAPolicy) {
     $ExcludeUG += $Policy.Conditions.Users.ExcludeRoles
     $ExcludeUG += $policy.conditions.users.ExcludeGuestsOrExternalUsers.GuestOrExternalUserTypes -replace ',', ', '
     
-    
-    $Apps += $Policy.Conditions.Applications.IncludeApplications
-    $Apps += $Policy.Conditions.Applications.ExcludeApplications
 
-    
     $InclLocation = $Null
     $ExclLocation = $Null 
     $InclLocation = $Policy.Conditions.Locations.includelocations
@@ -390,7 +378,7 @@ foreach ( $Policy in $CAPolicy) {
         'Session Controls'              = "";
         ApplicationEnforcedRestrictions = $Policy.SessionControls.ApplicationEnforcedRestrictions.IsEnabled
         CloudAppSecurity                = $Policy.SessionControls.CloudAppSecurity.IsEnabled
-        SignInFrequency                 = "$($Policy.SessionControls.SignInFrequency.Value) $($conditionalAccessPolicy.SessionControls.SignInFrequency.Type)"
+        SignInFrequency                 = "$($Policy.SessionControls.SignInFrequency.Value) $($Policy.SessionControls.SignInFrequency.Type)"
         PersistentBrowser               = $Policy.SessionControls.PersistentBrowser.Mode
         ContinuousAccessEvaluation      = $Policy.SessionControls.ContinuousAccessEvaluation.Mode
         ResiliantDefaults               = $policy.SessionControls.DisableResilienceDefaults
@@ -659,8 +647,8 @@ function Update-PolicyStatus {
     if ($PolicyCheck.SessionControls.CloudAppSecurity.IsEnabled) {
         $checkSession += "    CloudAppSecurity: $($PolicyCheck.SessionControls.CloudAppSecurity.IsEnabled)`n"
     }
-    if ($PolicyCheck.SessionControls.SignInFrequency.Value -and $conditionalAccessPolicy.SessionControls.SignInFrequency.Type) {
-        $checkSession += "    SignInFrequency: $($PolicyCheck.SessionControls.SignInFrequency.Value) $($conditionalAccessPolicy.SessionControls.SignInFrequency.Type)`n"
+    if ($PolicyCheck.SessionControls.SignInFrequency.Value -and $PolicyCheck.SessionControls.SignInFrequency.Type) {
+        $checkSession += "    SignInFrequency: $($PolicyCheck.SessionControls.SignInFrequency.Value) $($PolicyCheck.SessionControls.SignInFrequency.Type)`n"
     }
     if ($PolicyCheck.SessionControls.PersistentBrowser.Mode) {
         $checkSession += "    PersistentBrowser: $($PolicyCheck.SessionControls.PersistentBrowser.Mode)`n"
@@ -924,26 +912,21 @@ if ($HTMLExport) {
         <script>
         $(document).ready(function(){
             $("tr").click(function(){
-                if(!$(this).hasClass("selected")){
+                if (!$(this).hasClass("selected")) {
                     $(this).addClass("selected");
                 } else {
                     $(this).removeClass("selected");
                 }
             });
-            
             $("th").click(function(){
-                // Get the index of the clicked column
                 var colIndex = $(this).index();
-                // Select the corresponding col element and add or remove the class
                 $("colgroup col").eq(colIndex).toggleClass("colselected");
             });
-            $(document).ready(function() {
             $("#toggle-icon").click(function() {
                 $("#ca-export").toggle();
                 $("#ca-security-checks").toggle();
                 $("html, body").animate({ scrollTop: 0 }, "slow");
             });
-            }); 
         });
         </script>'
     $style = @"
@@ -955,9 +938,6 @@ if ($HTMLExport) {
                     .title {
                         font-size: 1.5em;
                         font-weight: bold;
-                        top: 0;
-                        right: 0;
-                        left: 0;
                     }
 
                     .navbar-custom { 
@@ -973,31 +953,10 @@ if ($HTMLExport) {
                         padding-bottom: 10px;
                     }
 
-                    .sr-only {
-                        border: 0;
-                        clip: rect(0, 0, 0, 0);
-                        height: 1px;
-                        margin: -1px;
-                        overflow: hidden;
-                        padding: 0;
-                        position: absolute;
-                        width: 1px;
-                    }
-
-                    .sr-only-focusable:active, 
-                    .sr-only-focusable:focus {
-                        clip: auto;
-                        height: auto;
-                        margin: 0;
-                        overflow: visible;
-                        position: static;
-                        width: auto;
-                    }
-
                     /* Export Policies Styles */
                     table {
                         border-collapse: collapse;
-                        margin-bottom: 30px;
+                        margin-bottom: 20px;
                         margin-top: 55px;
                         font-size: 0.9em;
                         min-width: 400px;
@@ -1010,8 +969,8 @@ if ($HTMLExport) {
                     }
 
                     th, td {
-                        min-width: 250px;
-                        padding: 12px 15px;
+                        min-width: 150px;
+                        padding: 8px 10px;
                         border: 1px solid lightgray;
                         vertical-align: top;
                         text-align: center;
@@ -1111,9 +1070,6 @@ if ($HTMLExport) {
                         display: flex;
                         align-items: center;
                         }
-                    .recommendations {
-                        font-family: Arial, sans-serif;
-                    }
                     .recommendation.success {
                         border-left-color: green;
                         border-left-width: 7px;
@@ -1123,8 +1079,8 @@ if ($HTMLExport) {
                         border-left-width: 7px;
                     }
                     .recommendation {
-                        padding: 10px;
-                        margin-bottom: 10px;
+                        padding: 8px;
+                        margin-bottom: 8px;
                         border: 1px solid #ddd;
                         border-radius: 5px;
                         background-color: #f9f9f9;
@@ -1270,10 +1226,8 @@ if ($HTMLExport) {
     
                   <link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/all.min.css' crossorigin='anonymous'>
                   <link rel='stylesheet' href='https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css' integrity='sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T' crossorigin='anonymous'>
-                  <script src='https://code.jquery.com/jquery-3.3.1.slim.min.js' integrity='sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo' crossorigin='anonymous'></script>
                   <script src='https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js' integrity='sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1' crossorigin='anonymous'></script>
                   <script src='https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js' integrity='sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM' crossorigin='anonymous'></script>
-                  <script src='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/js/all.js'></script>
                 $jquery<style>
                 $style
                 </style>
