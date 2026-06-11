@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Exports Entra ID Conditional Access policies to an HTML report with security recommendations.
 
@@ -31,7 +31,7 @@
 
 .NOTES
     Author:   Douglas Baker (@dougsbaker)
-    Version:  3.1
+    Version:  3.2
     License:  Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International
               https://creativecommons.org/licenses/by-nc-sa/4.0/
 
@@ -59,7 +59,33 @@ $JsonFileName = "\CAPolicy.json"
 $HTMLExport = $true
 $JsonExport = $false
 
+function Invoke-MgCall {
+    param([string]$Label, [scriptblock]$Call)
+    try { return & $Call }
+    catch {
+        Write-Host "Error: Failed during '$Label'." -ForegroundColor Red
+        if ($_.Exception.Message -match 'Assembly with same name|could not be loaded') {
+            Write-Host "Cause: Microsoft.Graph module version conflict." -ForegroundColor Yellow
+            Write-Host "Fix: Run 'Update-Module Microsoft.Graph -Force' in a new terminal, then retry." -ForegroundColor Yellow
+        } else {
+            Write-Host $_.Exception.Message -ForegroundColor Yellow
+        }
+        Exit
+    }
+}
 
+$installedGraphModules = Get-InstalledModule -Name 'Microsoft.Graph*' -ErrorAction SilentlyContinue
+if ($installedGraphModules) {
+    $versionGroups = $installedGraphModules | Group-Object Version
+    if ($versionGroups.Count -gt 1) {
+        $versionList = ($versionGroups | ForEach-Object { $_.Name }) -join ', '
+        Write-Host "Error: Multiple Microsoft.Graph module versions detected ($versionList)." -ForegroundColor Red
+        Write-Host "This causes assembly-load conflicts. Fix by running in a new PowerShell window:" -ForegroundColor Yellow
+        Write-Host "  Update-Module Microsoft.Graph -Force" -ForegroundColor Cyan
+        Write-Host "Then close and reopen your terminal before re-running this script." -ForegroundColor Yellow
+        Exit
+    }
+}
 
 
 $RequiredScopes = @(
@@ -100,7 +126,7 @@ if ($null -eq $context -or $missingScopes.Count -gt 0) {
 Write-Host "Connected: MgGraph (Tenant: $($context.TenantId))"
 
 
-$TenantData = Get-MgOrganization
+$TenantData = Invoke-MgCall 'Get-MgOrganization' { Get-MgOrganization }
 $TenantName = $TenantData.DisplayName
 $date = Get-Date
 Write-Host "Connected: $TenantName tenant"
@@ -109,11 +135,10 @@ $LinkURL = "https://portal.azure.com/#view/Microsoft_AAD_ConditionalAccess/Polic
 #Collect CA Policy
 Write-host "Exporting: CA Policy"
 if ($PolicyID) {
-    $CAPolicy = Get-MgIdentityConditionalAccessPolicy -ConditionalAccessPolicyId $PolicyID
+    $CAPolicy = Invoke-MgCall 'Get-MgIdentityConditionalAccessPolicy' { Get-MgIdentityConditionalAccessPolicy -ConditionalAccessPolicyId $PolicyID }
 }
 else {
-    $CAPolicy = Get-MgIdentityConditionalAccessPolicy -all -ExpandProperty *
-
+    $CAPolicy = Invoke-MgCall 'Get-MgIdentityConditionalAccessPolicy' { Get-MgIdentityConditionalAccessPolicy -all -ExpandProperty * }
 }
 
 
@@ -135,7 +160,7 @@ $ADsearch = $AdUsers | Where-Object {
 }
 
 #users Hashtable
-$mgobjects = Get-MgDirectoryObjectById -ids $ADsearch 
+$mgobjects = Invoke-MgCall 'Get-MgDirectoryObjectById' { Get-MgDirectoryObjectById -ids $ADsearch }
 $mgObjectsLookup = @{}
 foreach ($obj in $mgobjects) {
     $mgObjectsLookup[$obj.Id] = $obj.AdditionalProperties.displayName
@@ -195,7 +220,7 @@ foreach ($policy in $caPolicy) {
 }
 
 #Swap App ID with name
-$MGApps = Get-MgServicePrincipal -All 
+$MGApps = Invoke-MgCall 'Get-MgServicePrincipal' { Get-MgServicePrincipal -All }
 #Hash Table
 $MGAppsLookup = @{}
 foreach ($obj in $MGApps) {
@@ -224,7 +249,7 @@ foreach ($policy in $caPolicy) {
 }
 
 #Swap Location with Names
-$mgLoc = Get-MgIdentityConditionalAccessNamedLocation
+$mgLoc = Invoke-MgCall 'Get-MgIdentityConditionalAccessNamedLocation' { Get-MgIdentityConditionalAccessNamedLocation }
 $MGLocLookup = @{}
 foreach ($obj in $mgLoc) {
     $MGLocLookup[$obj.Id] = $obj.DisplayName
@@ -249,7 +274,7 @@ foreach ($policy in $caPolicy) {
 }
 
 #Switch TOU Id for Name
-$mgTou = Get-MgAgreement 
+$mgTou = Invoke-MgCall 'Get-MgAgreement' { Get-MgAgreement }
 $MGTouLookup = @{}
 foreach ($obj in $mgTou) {
     $MGTouLookup[$obj.Id] = $obj.DisplayName
@@ -266,7 +291,7 @@ foreach ($policy in $caPolicy) {
     }
 }
 #swap Admin Roles
-$mgRole = Get-MgDirectoryRoleTemplate 
+$mgRole = Invoke-MgCall 'Get-MgDirectoryRoleTemplate' { Get-MgDirectoryRoleTemplate }
 $mgRoleLookup = @{}
 foreach ($obj in $mgRole) {
     $mgRoleLookup[$obj.Id] = $obj.DisplayName
@@ -922,302 +947,334 @@ if ($HTMLExport) {
                 var colIndex = $(this).index();
                 $("colgroup col").eq(colIndex).toggleClass("colselected");
             });
-            $("#toggle-icon").click(function() {
-                $("#ca-export").toggle();
-                $("#ca-security-checks").toggle();
-                $("html, body").animate({ scrollTop: 0 }, "slow");
+            function showView(view) {
+                if (view === "table") {
+                    $("#ca-export").show();
+                    $("#ca-security-checks").hide();
+                    $("#btn-table").addClass("active");
+                    $("#btn-recs").removeClass("active");
+                } else {
+                    $("#ca-export").hide();
+                    $("#ca-security-checks").show();
+                    $("#btn-recs").addClass("active");
+                    $("#btn-table").removeClass("active");
+                }
+                $("html, body").animate({ scrollTop: 0 }, 200);
+            }
+            window.showView = showView;
+            $("#btn-recs").click(function() { showView("recs"); });
+            $("#btn-table").click(function() { showView("table"); });
+            $("#panel-toggle").click(function() {
+                $("#side-panel").addClass("open");
+                $("#panel-overlay").addClass("open");
             });
+            function closePanel() {
+                $("#side-panel").removeClass("open");
+                $("#panel-overlay").removeClass("open");
+            }
+            $("#panel-close").click(closePanel);
+            $("#panel-overlay").click(closePanel);
+            $(document).keydown(function(e) { if (e.key === "Escape") closePanel(); });
         });
         </script>'
+
     $style = @"
-    /* General Styles */
-                    html, body {
-                        font-family: Arial, sans-serif;
-                    }
-
-                    .title {
-                        font-size: 1.5em;
-                        font-weight: bold;
-                    }
-
-                    .navbar-custom { 
-                        background-color: #005494;
-                        color: white; 
-                        padding-bottom: 10px;
-                    }
-
-                    .navbar-custom .navbar-brand, 
-                    .navbar-custom .navbar-text { 
-                        color: white; 
-                        padding-top: 70px;
-                        padding-bottom: 10px;
-                    }
-
-                    /* Export Policies Styles */
-                    table {
-                        border-collapse: collapse;
-                        margin-bottom: 20px;
-                        margin-top: 55px;
-                        font-size: 0.9em;
-                        min-width: 400px;
-                    }
-
-                    thead tr {
-                        background-color: #009879;
-                        color: #ffffff;
-                        text-align: center;
-                    }
-
-                    th, td {
-                        min-width: 150px;
-                        padding: 8px 10px;
-                        border: 1px solid lightgray;
-                        vertical-align: top;
-                        text-align: center;
-                    }
-
-                    tbody tr:nth-of-type(even) {
-                        background-color: #f3f3f3;
-                    }
-
-                    tbody tr:last-of-type {
-                        border-bottom: 2px solid #009879;
-                    }
-
-                    tr:hover {
-                        background-color: #d8d8d8 !important;
-                    }
-
-                    .selected:not(th) {
-                        background-color: #eaf7ff !important;
-                    }
-
-                    th {
-                        background-color: white;
-                    }
-
-                    .colselected {
-                        width: 10%;
-                        border: 5px solid #59c7fb;
-                    }
-
-                    table tr th:first-child, table tr td:first-child {
-                        position: sticky;
-                        inset-inline-start: 0; 
-                        background-color: #005494;
-                        border: 0px;
-                        color: #fff;
-                        font-weight: bolder;
-                        text-align: center;
-                    }
-
-                    tbody tr:nth-of-type(even) td:first-child {
-                        background-color: #547c9b;
-                    }
-
-                    tbody tr:nth-of-type(5),
-                    tbody tr:nth-of-type(8),
-                    tbody tr:nth-of-type(13),
-                    tbody tr:nth-of-type(25),
-                    tbody tr:nth-of-type(37) {
-                        background-color: #005494 !important;
-                    }
-                    .tooltip-container {
-                                position: relative;
-                                display: inline-block;
-                            }
-
-                            /* Tooltip text */
-                            .tooltip-text {
-                                visibility: hidden;
-                                width: 200px;
-                                background-color: black;
-                                color: #fff;
-                                text-align: center;
-                                border-radius: 6px;
-                                padding: 5px 0;
-                                position: absolute;
-                                z-index: 1;
-                                top: 115%; /* Position the tooltip below the text */
-                                left: 50%;
-                                margin-left: -100px;
-                                opacity: 0;
-                                transition: opacity 0.3s;
-                            }
-
-                            .tooltip-container:hover .tooltip-text {
-                                visibility: visible;
-                                opacity: 1;
-                            }
-                    /* Recommendations Styles */
-                    #ca-security-checks {
-                        padding: 20px;
-                        background-color: #f8f9fa; 
-                        border: 1px solid #ddd; 
-                        border-radius: 5px;
-                        margin-top: 55px;
-                    }
-
-                    #ca-security-checks h2 {
-                        margin-top: 0;
-                        color: #343a40;
-                    }
-
-                    #ca-security-checks p {
-                        color: #6c757d;
-                    }
-                    .header {
-                        display: flex;
-                        align-items: center;
-                        }
-                    .recommendation.success {
-                        border-left-color: green;
-                        border-left-width: 7px;
-                    }
-                    .recommendation.warning {
-                        border-left-color: orange;
-                        border-left-width: 7px;
-                    }
-                    .recommendation {
-                        padding: 8px;
-                        margin-bottom: 8px;
-                        border: 1px solid #ddd;
-                        border-radius: 5px;
-                        background-color: #f9f9f9;
-                    }
-
-                    .recommendation div {
-                        margin-bottom: 5px;
-                    }
-                    .control {
-                        color: gray;
-                    }
-
-                    .links div {
-                        margin-left: 20px;
-                    }
-
-                    .recommendation a {
-                        color: #0073e6;
-                        text-decoration: none;
-                    }
-
-                    .recommendation a:hover {
-                        text-decoration: underline;
-                    }
-
-                    .recommendation strong {
-                        display: inline-block;
-                    }
-
-                    .status-icon {
-                        display: inline-block;
-                        padding-left: 10px;
-                    }
-
-                    .status-icon.success {
-                        color: green;
-                    }
-
-                    .status-icon.warning {
-                        color: orange;
-                    }
-
-                    .status-icon.error {
-                        color: red;
-                    }
-
-                    .policy {
-    margin-top: 10px;
+*, *::before, *::after { box-sizing: border-box; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 15px;
+    background: #f1f5f9;
+    color: #1e293b;
+    margin: 0;
+    padding-top: 56px;
 }
 
-.policy-item {
-    border: 2px solid;
-    padding: 10px;
-    border-radius: 5px;
-    margin-bottom: 10px;
-}
-
-.policy-item.success {
-    border-color: green;
-    background-color: #e6ffe6;
-}
-
-.policy-item.warning {
-    border-color: orange;
-    background-color: #fff8e6;
-}
-
-.policy-item.error {
-    border-color: red;
-    background-color: #ffe6e6;
-}
-
-.policy-item strong {
-    display: block;
-    margin-bottom: 5px;
-}
-
-.policy-content {
-    display: flex;
-    flex-direction: column;
-    padding-left: 20px;
-    margin-top: 5px;
-}
-
-.policy-include, .policy-exclude, .policy-grant {
-    display: flex;
-    align-items: flex-start;
-    margin-top: 5px;
-}
-
-.label-container {
+/* Navbar */
+.navbar-custom {
+    background: linear-gradient(135deg, #003f7a 0%, #005494 100%);
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 56px;
     display: flex;
     align-items: center;
-    margin-right: 10px; /* Space between the label and content */
+    justify-content: space-between;
+    padding: 0 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    z-index: 1030;
 }
+.nav-left { display: flex; align-items: center; gap: 12px; min-width: 220px; }
+.nav-panel-btn {
+    background: rgba(255,255,255,0.12);
+    border: none;
+    color: #fff;
+    width: 34px; height: 34px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 1em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    flex-shrink: 0;
+}
+.nav-panel-btn:hover { background: rgba(255,255,255,0.22); }
+.nav-brand-icon { color: rgba(255,255,255,0.6); font-size: 1.1em; }
+.nav-title  { font-size: 0.95em; font-weight: 600; color: #fff; white-space: nowrap; }
+.nav-subtitle { font-size: 0.7em; color: rgba(255,255,255,0.55); white-space: nowrap; }
+.nav-center { display: flex; align-items: center; flex: 1; justify-content: center; }
+.view-toggle {
+    display: flex;
+    background: rgba(0,0,0,0.22);
+    border-radius: 8px;
+    padding: 3px;
+    gap: 3px;
+}
+.view-btn {
+    background: transparent;
+    border: none;
+    color: rgba(255,255,255,0.65);
+    padding: 6px 18px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.82em;
+    font-weight: 500;
+    transition: all 0.2s;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.view-btn.active { background: #fff; color: #005494; font-weight: 600; }
+.view-btn:not(.active):hover { background: rgba(255,255,255,0.15); color: #fff; }
+.nav-right { display: flex; flex-direction: column; align-items: flex-end; min-width: 220px; }
+.nav-tenant { font-size: 0.88em; font-weight: 600; color: #fff; }
+.nav-date   { font-size: 0.7em; color: rgba(255,255,255,0.55); }
 
+/* Side Panel */
+.side-panel {
+    position: fixed;
+    top: 0; left: -280px;
+    width: 265px; height: 100%;
+    background: #0f172a;
+    z-index: 2100;
+    transition: left 0.28s cubic-bezier(0.4,0,0.2,1);
+    display: flex;
+    flex-direction: column;
+    box-shadow: 4px 0 24px rgba(0,0,0,0.45);
+}
+.side-panel.open { left: 0; }
+.panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    height: 56px;
+    background: #005494;
+    flex-shrink: 0;
+}
+.panel-header-title {
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.88em;
+    letter-spacing: 0.04em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.panel-close-btn {
+    background: rgba(255,255,255,0.1);
+    border: none;
+    color: rgba(255,255,255,0.8);
+    width: 28px; height: 28px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85em;
+    transition: background 0.15s;
+}
+.panel-close-btn:hover { background: rgba(255,255,255,0.2); color: #fff; }
+.panel-body { flex: 1; overflow-y: auto; padding: 8px 0; }
+.panel-section { padding: 12px 16px 6px; }
+.panel-section-title {
+    font-size: 0.65em;
+    font-weight: 700;
+    color: rgba(255,255,255,0.3);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    padding-left: 8px;
+}
+.panel-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    color: rgba(255,255,255,0.7);
+    text-decoration: none;
+    border-radius: 6px;
+    font-size: 0.83em;
+    transition: all 0.15s;
+    margin-bottom: 1px;
+}
+.panel-link:hover { background: rgba(255,255,255,0.08); color: #fff; text-decoration: none; }
+.panel-link i { width: 14px; text-align: center; opacity: 0.5; font-size: 0.9em; }
+.panel-link:hover i { opacity: 0.85; }
+.panel-divider { height: 1px; background: rgba(255,255,255,0.06); margin: 6px 16px; }
+.panel-footer {
+    padding: 14px 18px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    font-size: 0.7em;
+    color: rgba(255,255,255,0.25);
+    flex-shrink: 0;
+}
+.panel-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(15,23,42,0.55);
+    z-index: 2090;
+    backdrop-filter: blur(2px);
+}
+.panel-overlay.open { display: block; }
+
+/* Policy Matrix Table */
+.policy-export { padding: 8px 24px 20px; box-sizing: border-box; }
+table {
+    border-collapse: collapse;
+    margin-bottom: 20px;
+    font-size: 0.87em;
+    min-width: 400px;
+    background: #fff;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+}
+thead tr { background: linear-gradient(90deg, #005494, #0066b3); color: #fff; text-align: center; }
+th, td { min-width: 150px; padding: 8px 10px; border: 1px solid #e2e8f0; vertical-align: top; text-align: center; }
+tbody tr:nth-of-type(even) { background: #f8fafc; }
+tbody tr:last-of-type { border-bottom: 2px solid #009879; }
+tr:hover { background: #e0f2fe !important; }
+.selected:not(th) { background: #dbeafe !important; }
+th { background: #fff; }
+.colselected { border: 3px solid #0ea5e9; }
+table tr th:first-child, table tr td:first-child {
+    position: sticky;
+    inset-inline-start: 0;
+    background: #005494;
+    border: 0;
+    color: #fff;
+    font-weight: 600;
+    text-align: center;
+}
+tbody tr:nth-of-type(even) td:first-child { background: #0066b3; }
+tbody tr:nth-of-type(5),
+tbody tr:nth-of-type(8),
+tbody tr:nth-of-type(13),
+tbody tr:nth-of-type(25),
+tbody tr:nth-of-type(37) { background: #1e3a5f !important; color: #fff; }
+
+/* Tooltip */
+.tooltip-container { position: relative; display: inline-block; }
+.tooltip-text {
+    visibility: hidden;
+    width: 200px;
+    background: #1e293b;
+    color: #fff;
+    text-align: center;
+    border-radius: 6px;
+    padding: 6px 8px;
+    position: absolute;
+    z-index: 1;
+    top: 115%; left: 50%;
+    margin-left: -100px;
+    opacity: 0;
+    transition: opacity 0.2s;
+    font-size: 0.8em;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+.tooltip-container:hover .tooltip-text { visibility: visible; opacity: 1; }
+
+/* Recommendations */
+#ca-security-checks { padding: 12px 24px 24px; max-width: 1000px; margin: 0 auto; }
+#ca-security-checks > h2 { font-size: 1.25em; color: #0f172a; font-weight: 700; margin: 0 0 4px; }
+#ca-security-checks > p  { color: #64748b; margin: 0 0 20px; font-size: 0.85em; }
+.recommendation {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-left: 4px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 14px 16px 12px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    position: relative;
+    transition: box-shadow 0.2s, transform 0.1s;
+}
+.recommendation:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.08); transform: translateY(-1px); }
+.recommendation.success { border-left-color: #10b981; }
+.recommendation.warning { border-left-color: #f59e0b; }
+.recommendation div { margin-bottom: 3px; }
+.header { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
+.title  { font-size: 0.97em; font-weight: 600; color: #0f172a; flex: 1; }
+.control {
+    font-size: 0.72em;
+    background: #f1f5f9;
+    color: #64748b;
+    padding: 2px 8px;
+    border-radius: 20px;
+    white-space: nowrap;
+    font-weight: 600;
+    border: 1px solid #e2e8f0;
+}
+.recommendation-description { font-size: 0.88em; color: #475569; line-height: 1.55; margin-bottom: 8px; }
+.recommendation-links  { font-size: 0.84em; color: #64748b; margin-bottom: 6px; }
+.recommendation-links strong { color: #334155; }
+.links div { margin-top: 3px; margin-left: 0; }
+.recommendation a       { color: #0369a1; text-decoration: none; }
+.recommendation a:hover { text-decoration: underline; color: #0284c7; }
+.recommendation-comment {
+    font-size: 0.86em;
+    color: #475569;
+    padding: 7px 10px;
+    background: #f8fafc;
+    border-radius: 5px;
+    border-left: 3px solid #cbd5e1;
+    margin-top: 8px;
+}
+.recommendation.success .recommendation-comment { border-left-color: #10b981; background: #f0fdf4; color: #065f46; }
+.recommendation.warning .recommendation-comment { border-left-color: #f59e0b; background: #fffbeb; color: #92400e; }
+.recommendation strong { display: inline-block; }
+.status-icon { display: inline-block; padding-left: 6px; }
+.status-icon.success { color: #10b981; }
+.status-icon.warning { color: #f59e0b; }
+.status-icon.error   { color: #ef4444; }
+.status-icon-large { position: absolute; top: 12px; right: 14px; font-size: 1.3em; }
+.status-icon-large.success { color: #10b981; }
+.status-icon-large.warning { color: #f59e0b; }
+.status-icon-large.error   { color: #ef4444; }
+
+/* Policy items */
+.policy { margin-top: 10px; }
+.policy-item { border: 1px solid #e2e8f0; border-left: 3px solid #cbd5e1; padding: 10px 12px; border-radius: 6px; margin-bottom: 8px; background: #fafafa; }
+.policy-item.success { border-left-color: #10b981; background: #f0fdf4; }
+.policy-item.warning { border-left-color: #f59e0b; background: #fffbeb; }
+.policy-item.error   { border-left-color: #ef4444; background: #fef2f2; }
+.policy-item strong { display: block; margin-bottom: 4px; font-size: 0.88em; }
+.policy-header { position: relative; padding-right: 40px; }
+.policy-content { display: flex; flex-direction: column; padding-left: 14px; margin-top: 6px; gap: 2px; }
+.policy-include, .policy-exclude, .policy-grant { display: flex; align-items: flex-start; margin-top: 4px; font-size: 0.85em; }
+.label-container { display: flex; align-items: center; margin-right: 8px; min-width: 40px; }
 .include-label, .exclude-label, .grant-label {
     writing-mode: vertical-rl;
-    transform: rotate(180deg); /* Optional: Rotate the text to read from bottom to top */
-    border-left: 3px solid darkgrey;
-    color: darkgray;
+    transform: rotate(180deg);
+    border-left: 2px solid #cbd5e1;
+    color: #94a3b8;
+    font-size: 0.72em;
+    padding: 2px 3px;
 }
-
-.include-content, .exclude-content, .grant-content {
-    margin-left: 10px; /* Space between the label and content */
-}
-
-.policy-header {
-    position: relative;
-    padding-right: 40px;
-}
-
-
-                    .status-icon-large {
-                        position: absolute;
-                        top: 0;
-                        right: 0;
-                        font-size: 2em;
-                    }
-
-                    .status-icon-large.success {
-                        color: green;
-                    }
-
-                    .status-icon-large.warning {
-                        color: orange;
-                    }
-
-                    .status-icon-large.error {
-                        color: red;
-                    }
-
-                    .fa-external-link-alt {
-                        color: black;
-                    }
-
-
+.include-content, .exclude-content, .grant-content { margin-left: 6px; color: #334155; line-height: 1.5; }
+.fa-external-link-alt { color: #94a3b8; font-size: 0.75em; margin-left: 4px; }
 "@
 
     $html = "<html><head><base href='https://docs.microsoft.com/' target='_blank'>
@@ -1231,20 +1288,57 @@ if ($HTMLExport) {
                 $jquery<style>
                 $style
                 </style>
-                </head><body> <nav class='navbar  fixed-top navbar-custom p-3 border-bottom'>
-                <div class='container-fluid'>
-                    <div class='col-sm' style='text-align:left'>
-                        <div class='row'><div><i class='fa fa-server' aria-hidden='true'></i></div><div class='ml-3'><strong>CA Export</strong></div><div class='ml-3' id='toggle-icon' style='cursor: pointer;'><i class='fas fa-exchange-alt'></i> Change View</div>
-</div>
+                </head><body>
+                <nav class='navbar-custom'>
+                    <div class='nav-left'>
+                        <button id='panel-toggle' class='nav-panel-btn' title='Open navigation'><i class='fas fa-bars'></i></button>
+                        <i class='fas fa-shield-alt nav-brand-icon'></i>
+                        <div>
+                            <div class='nav-title'>CA Policy Report</div>
+                            <div class='nav-subtitle'>Conditional Access Analysis</div>
+                        </div>
                     </div>
-                    <div class='col-sm' style='text-align:center'>
-                        <strong>$Tenantname</strong>
+                    <div class='nav-center'>
+                        <div class='view-toggle'>
+                            <button id='btn-recs' class='view-btn active'><i class='fas fa-clipboard-check'></i> Recommendations</button>
+                            <button id='btn-table' class='view-btn'><i class='fas fa-table'></i> Policy Matrix</button>
+                        </div>
                     </div>
-                    <div class='col-sm' style='text-align:right'>
-                    <strong>$Date</strong>
+                    <div class='nav-right'>
+                        <span class='nav-tenant'><i class='fas fa-building' style='opacity:0.5;margin-right:5px;font-size:0.85em'></i>$Tenantname</span>
+                        <span class='nav-date'>$Date</span>
                     </div>
+                </nav>
+                <div id='side-panel' class='side-panel'>
+                    <div class='panel-header'>
+                        <div class='panel-header-title'><i class='fas fa-shield-alt'></i> CA Export</div>
+                        <button id='panel-close' class='panel-close-btn' title='Close panel'><i class='fas fa-times'></i></button>
+                    </div>
+                    <div class='panel-body'>
+                        <div class='panel-section'>
+                            <div class='panel-section-title'>Azure Administration</div>
+                            <a href='https://portal.azure.com' class='panel-link' target='_blank'><i class='fas fa-cloud'></i> Azure Portal</a>
+                            <a href='https://entra.microsoft.com' class='panel-link' target='_blank'><i class='fas fa-id-card'></i> Entra Admin Center</a>
+                            <a href='https://entra.microsoft.com/#view/Microsoft_AAD_ConditionalAccess/ConditionalAccessBlade' class='panel-link' target='_blank'><i class='fas fa-lock'></i> Conditional Access Policies</a>
+                            <a href='https://security.microsoft.com' class='panel-link' target='_blank'><i class='fas fa-shield-alt'></i> Microsoft Defender</a>
+                        </div>
+                        <div class='panel-divider'></div>
+                        <div class='panel-section'>
+                            <div class='panel-section-title'>References</div>
+                            <a href='https://learn.microsoft.com/en-us/entra/identity/conditional-access/overview' class='panel-link' target='_blank'><i class='fas fa-book'></i> CA Documentation</a>
+                            <a href='https://aka.ms/CATemplates' class='panel-link' target='_blank'><i class='fas fa-layer-group'></i> CA Policy Templates</a>
+                            <a href='https://learn.microsoft.com/en-us/entra/identity/conditional-access/plan-conditional-access' class='panel-link' target='_blank'><i class='fas fa-sitemap'></i> CA Planning Guide</a>
+                        </div>
+                        <div class='panel-divider'></div>
+                        <div class='panel-section'>
+                            <div class='panel-section-title'>My Links</div>
+                            <a href='https://dougsbaker.com' class='panel-link' target='_blank'><i class='fas fa-globe'></i> My Website</a>
+                            <a href='https://github.com/dougsbaker' class='panel-link' target='_blank'><i class='fab fa-github'></i> GitHub</a>
+                        </div>
+                    </div>
+                    <div class='panel-footer'>CA Policy Export &bull; DougSBaker &bull; 2026</div>
                 </div>
-            </nav> "
+                <div id='panel-overlay' class='panel-overlay'></div>"
        
     $SecurityCheck = Display-RecommendationsAsHTMLFragment -Recommendations $recommendations
 
