@@ -74,7 +74,7 @@ function Invoke-MgCall {
     }
 }
 
-$installedGraphModules = Get-InstalledModule -Name 'Microsoft.Graph*' -ErrorAction SilentlyContinue
+$installedGraphModules= Get-InstalledModule -Name 'Microsoft.Graph' -ErrorAction SilentlyContinue
 if ($installedGraphModules) {
     $versionGroups = $installedGraphModules | Group-Object Version
     if ($versionGroups.Count -gt 1) {
@@ -83,10 +83,10 @@ if ($installedGraphModules) {
         Write-Host "This causes assembly-load conflicts. Fix by running in a new PowerShell window:" -ForegroundColor Yellow
         Write-Host "  Update-Module Microsoft.Graph -Force" -ForegroundColor Cyan
         Write-Host "Then close and reopen your terminal before re-running this script." -ForegroundColor Yellow
-        Exit
+       # Exit
     }
 }
-
+Import-Module Microsoft.Graph.Authentication 
 
 $RequiredScopes = @(
     'Policy.Read.All',
@@ -136,8 +136,7 @@ $LinkURL = "https://portal.azure.com/#view/Microsoft_AAD_ConditionalAccess/Polic
 Write-host "Exporting: CA Policy"
 if ($PolicyID) {
     $CAPolicy = Invoke-MgCall 'Get-MgIdentityConditionalAccessPolicy' { Get-MgIdentityConditionalAccessPolicy -ConditionalAccessPolicyId $PolicyID }
-}
-else {
+} else {
     $CAPolicy = Invoke-MgCall 'Get-MgIdentityConditionalAccessPolicy' { Get-MgIdentityConditionalAccessPolicy -all -ExpandProperty * }
 }
 
@@ -155,15 +154,21 @@ $ADUsers += $CAPolicy.Conditions.Users.ExcludeRoles
 
 
 # Filter the $AdUsers array to include only valid GUIDs
-$ADsearch = $AdUsers | Where-Object {
+$ADsearch = @($AdUsers | Where-Object {
     ([Guid]::TryParse($_, [ref] [Guid]::Empty))
-}
+} | Select-Object -Unique)
 
 #users Hashtable
-$mgobjects = Invoke-MgCall 'Get-MgDirectoryObjectById' { Get-MgDirectoryObjectById -ids $ADsearch }
+# getByIds accepts a maximum of 1000 ids per request, so batch the lookup
 $mgObjectsLookup = @{}
-foreach ($obj in $mgobjects) {
-    $mgObjectsLookup[$obj.Id] = $obj.AdditionalProperties.displayName
+$batchSize = 1000
+for ($start = 0; $start -lt $ADsearch.Count; $start += $batchSize) {
+    $end = [Math]::Min($start + $batchSize, $ADsearch.Count) - 1
+    $idBatch = $ADsearch[$start..$end]
+    $mgobjects = Invoke-MgCall 'Get-MgDirectoryObjectById' { Get-MgDirectoryObjectById -ids $idBatch }
+    foreach ($obj in $mgobjects) {
+        $mgObjectsLookup[$obj.Id] = $obj.AdditionalProperties.displayName
+    }
 }
 
 
@@ -931,6 +936,106 @@ function Display-RecommendationsAsHTMLFragment {
     return $htmlFragment
 }
 
+function Display-NamedLocationsAsHTMLFragment {
+    param (
+        [Parameter(Mandatory = $false)]
+        [object[]]$NamedLocations
+    )
+
+    $htmlFragment = @"
+<div class='named-locations' id='ca-named-locations' style='display: none;'>
+    <h2>Named Locations</h2>
+    <p>Network locations defined in this tenant and available to Conditional Access policies.</p>
+"@
+
+    if (-not $NamedLocations -or @($NamedLocations).Count -eq 0) {
+        $htmlFragment += @"
+    <div class='named-location'>
+        <div class='nl-empty'>No named locations are defined in this tenant.</div>
+    </div>
+</div>
+"@
+        return $htmlFragment
+    }
+
+    foreach ($loc in ($NamedLocations | Sort-Object DisplayName)) {
+        $ap = $loc.AdditionalProperties
+        $odataType = "$($ap['@odata.type'])" -replace '^#microsoft\.graph\.', ''
+        $isTrusted = ($ap['isTrusted'] -eq $true)
+
+        $badges = ""
+        $detail = ""
+
+        switch ($odataType) {
+            'ipNamedLocation' {
+                $NLClass = 'ip'
+                $TypeLabel = 'IP Ranges'
+                $ranges = @($ap['ipRanges'])
+                $badges += if ($isTrusted) { "<span class='nl-badge trusted'><i class='fas fa-check-circle'></i> Trusted</span>" } else { "<span class='nl-badge'>Not Trusted</span>" }
+                $badges += "<span class='nl-badge'>$($ranges.Count) range(s)</span>"
+
+                $items = ""
+                foreach ($range in $ranges) {
+                    $ipVersion = if ("$($range['@odata.type'])" -match 'iPv6') { 'IPv6' } else { 'IPv4' }
+                    $items += "<span class='nl-chip'><span class='nl-chip-tag'>$ipVersion</span>$($range['cidrAddress'])</span>"
+                }
+                $detail = "<div class='nl-detail'><div class='nl-detail-label'>IP Ranges</div><div class='nl-chips'>$items</div></div>"
+            }
+            'countryNamedLocation' {
+                $NLClass = 'country'
+                $TypeLabel = 'Countries / Regions'
+                $countries = @($ap['countriesAndRegions'])
+                $badges += "<span class='nl-badge'>$($countries.Count) countries/regions</span>"
+                if ($ap['includeUnknownCountriesAndRegions'] -eq $true) {
+                    $badges += "<span class='nl-badge warn'>Includes unknown areas</span>"
+                }
+                if ($ap['countryLookupMethod']) {
+                    $badges += "<span class='nl-badge'>Lookup: $($ap['countryLookupMethod'])</span>"
+                }
+
+                $items = ""
+                foreach ($country in ($countries | Sort-Object)) {
+                    $items += "<span class='nl-chip'>$country</span>"
+                }
+                $detail = "<div class='nl-detail'><div class='nl-detail-label'>Countries / Regions</div><div class='nl-chips'>$items</div></div>"
+            }
+            default {
+                $NLClass = 'other'
+                $TypeLabel = if ($odataType) { $odataType } else { 'Unknown Type' }
+                $items = ""
+                foreach ($key in ($ap.Keys | Where-Object { $_ -ne '@odata.type' } | Sort-Object)) {
+                    $items += "<span class='nl-chip'><span class='nl-chip-tag'>$key</span>$($ap[$key])</span>"
+                }
+                $detail = "<div class='nl-detail'><div class='nl-detail-label'>Properties</div><div class='nl-chips'>$items</div></div>"
+            }
+        }
+
+        if ($badges) { $badges = "<div class='nl-badges'>$badges</div>" }
+
+        $htmlFragment += @"
+    <div class='named-location $NLClass'>
+        <div class='nl-header'>
+            <div class='nl-title'>$($loc.DisplayName)</div>
+            <div class='nl-type'>$TypeLabel</div>
+        </div>
+        $badges
+        $detail
+        <div class='nl-meta'>
+            <span><strong>Id:</strong> $($loc.Id)</span>
+            <span><strong>Created:</strong> $($loc.CreatedDateTime)</span>
+            <span><strong>Modified:</strong> $($loc.ModifiedDateTime)</span>
+        </div>
+    </div>
+"@
+    }
+
+    $htmlFragment += @"
+</div>
+"@
+
+    return $htmlFragment
+}
+
 if ($HTMLExport) {
     Write-host "Saving to File: HTML"
     $jquery = '  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
@@ -948,22 +1053,24 @@ if ($HTMLExport) {
                 $("colgroup col").eq(colIndex).toggleClass("colselected");
             });
             function showView(view) {
+                $("#ca-export, #ca-security-checks, #ca-named-locations").hide();
+                $(".view-btn").removeClass("active");
                 if (view === "table") {
                     $("#ca-export").show();
-                    $("#ca-security-checks").hide();
                     $("#btn-table").addClass("active");
-                    $("#btn-recs").removeClass("active");
+                } else if (view === "locations") {
+                    $("#ca-named-locations").show();
+                    $("#btn-locations").addClass("active");
                 } else {
-                    $("#ca-export").hide();
                     $("#ca-security-checks").show();
                     $("#btn-recs").addClass("active");
-                    $("#btn-table").removeClass("active");
                 }
                 $("html, body").animate({ scrollTop: 0 }, 200);
             }
             window.showView = showView;
             $("#btn-recs").click(function() { showView("recs"); });
             $("#btn-table").click(function() { showView("table"); });
+            $("#btn-locations").click(function() { showView("locations"); });
             $("#panel-toggle").click(function() {
                 $("#side-panel").addClass("open");
                 $("#panel-overlay").addClass("open");
@@ -1254,6 +1361,65 @@ tbody tr:nth-of-type(37) { background: #1e3a5f !important; color: #fff; }
 .status-icon-large.warning { color: #f59e0b; }
 .status-icon-large.error   { color: #ef4444; }
 
+/* Named Locations */
+#ca-named-locations { padding: 12px 24px 24px; max-width: 1000px; margin: 0 auto; }
+#ca-named-locations > h2 { font-size: 1.25em; color: #0f172a; font-weight: 700; margin: 0 0 4px; }
+#ca-named-locations > p  { color: #64748b; margin: 0 0 20px; font-size: 0.85em; }
+.named-location {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-left: 4px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 14px 16px 12px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    transition: box-shadow 0.2s, transform 0.1s;
+}
+.named-location:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.08); transform: translateY(-1px); }
+.named-location.ip      { border-left-color: #0ea5e9; }
+.named-location.country { border-left-color: #8b5cf6; }
+.named-location.other   { border-left-color: #94a3b8; }
+.nl-header { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
+.nl-title  { font-size: 0.97em; font-weight: 600; color: #0f172a; flex: 1; }
+.nl-type {
+    font-size: 0.72em;
+    background: #f1f5f9;
+    color: #64748b;
+    padding: 2px 8px;
+    border-radius: 20px;
+    white-space: nowrap;
+    font-weight: 600;
+    border: 1px solid #e2e8f0;
+}
+.nl-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.nl-badge {
+    font-size: 0.72em;
+    font-weight: 600;
+    color: #475569;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    padding: 2px 8px;
+}
+.nl-badge.trusted { color: #065f46; background: #f0fdf4; border-color: #a7f3d0; }
+.nl-badge.warn    { color: #92400e; background: #fffbeb; border-color: #fde68a; }
+.nl-detail { margin-bottom: 10px; }
+.nl-detail-label { font-size: 0.75em; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 5px; }
+.nl-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.nl-chip {
+    font-family: Consolas, 'Courier New', monospace;
+    font-size: 0.8em;
+    color: #334155;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    padding: 3px 8px;
+}
+.nl-chip-tag { color: #94a3b8; font-size: 0.85em; font-weight: 600; margin-right: 6px; }
+.nl-meta { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.75em; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 8px; }
+.nl-meta strong { color: #64748b; font-weight: 600; }
+.nl-empty { font-size: 0.88em; color: #64748b; }
+
 /* Policy items */
 .policy { margin-top: 10px; }
 .policy-item { border: 1px solid #e2e8f0; border-left: 3px solid #cbd5e1; padding: 10px 12px; border-radius: 6px; margin-bottom: 8px; background: #fafafa; }
@@ -1302,6 +1468,7 @@ tbody tr:nth-of-type(37) { background: #1e3a5f !important; color: #fff; }
                         <div class='view-toggle'>
                             <button id='btn-recs' class='view-btn active'><i class='fas fa-clipboard-check'></i> Recommendations</button>
                             <button id='btn-table' class='view-btn'><i class='fas fa-table'></i> Policy Matrix</button>
+                            <button id='btn-locations' class='view-btn'><i class='fas fa-map-marker-alt'></i> Named Locations</button>
                         </div>
                     </div>
                     <div class='nav-right'>
@@ -1341,6 +1508,7 @@ tbody tr:nth-of-type(37) { background: #1e3a5f !important; color: #fff; }
                 <div id='panel-overlay' class='panel-overlay'></div>"
        
     $SecurityCheck = Display-RecommendationsAsHTMLFragment -Recommendations $recommendations
+    $NamedLocationView = Display-NamedLocationsAsHTMLFragment -NamedLocations $mgLoc
 
     Write-host "Launching: Web Browser"           
     $Launch = $ExportLocation + $FileName
@@ -1348,6 +1516,7 @@ tbody tr:nth-of-type(37) { background: #1e3a5f !important; color: #fff; }
     $HTML += $pivot  | Where-Object { $_."CA Item" -ne 'row1' } | Sort-object { $sort.IndexOf($_."CA Item") } | convertto-html -Fragment
     $html += "</div>"
     $html += $SecurityCheck
+    $html += $NamedLocationView
     Add-Type -AssemblyName System.Web
     [System.Web.HttpUtility]::HtmlDecode($HTML) | Out-File $Launch
    
