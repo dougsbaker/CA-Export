@@ -850,7 +850,7 @@ $CheckFunctions = @{
     }
     "CA-10" = {
         param($PolicyCheck)
-        $PolicyCheck.Conditions.AdditionalProperties.authenticationFlows.Values -split ',' -contains "deviceCodeFlow" -and
+        $PolicyCheck.Conditions.AuthenticationFlows.TransferMethods -split ',' -contains "deviceCodeFlow" -and
         $PolicyCheck.grantcontrols.BuiltInControls -contains "Block"
     }
     "CA-11" = {
@@ -872,7 +872,6 @@ foreach ($policy in $CAPolicy) {
         Update-PolicyStatus -Recommendation ([ref]$recommendation) -PolicyCheck $policy -StatusCheck $CheckFunctions[$recommendation.Control]
     }
 }
-
 
 
 
